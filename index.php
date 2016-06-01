@@ -103,8 +103,9 @@ if ($width) {
   // and width inserted
   $cacheFile = insert_width(strtr(substr($picPath, strlen($baseDir)+1), '/', '_'), $width);
   $cachePath = $cacheDir.'/'.$cacheFile;
-  if (file_exists($cachePath)) {
-    //TODO: touch file
+  if (file_exists($cachePath) && filemtime($cachePath) >= filemtime($picPath)) {
+    // touch file for LRU algorithm
+    touch($cachePath);
   } else {
     // resize the image and add to cache
     if ($useImagick) {
