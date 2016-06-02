@@ -4,10 +4,10 @@ find /home/groovymarty/website/home -type f | while read src; do
   if [ -f "$targ" ]; then
     if [ "$src" -ot "$targ" ]; then
       echo "$targ has changed, copying to website/home"
-      cp $targ $src
+      cp -p $targ $src
     elif [ "$targ" -ot "src" ]; then
-      echo "$src has changed, copying to target"
-      cp $src $targ
+      ccho "$src has changed, copying to target"
+      cp -p $src $targ
     fi
   fi
 done
