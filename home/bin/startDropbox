@@ -1,0 +1,6 @@
+#!/bin/bash
+echo "Starting dropbox"
+/home/groovymarty/bin/dropbox.py start
+/usr/bin/renice -n 19 -p `cat /home/groovymarty/.dropbox/dropbox.pid`
+/usr/bin/ionice -c 3 -p `cat /home/groovymarty/.dropbox/dropbox.pid`
+/home/groovymarty/bin/dropbox.py throttle 500 500

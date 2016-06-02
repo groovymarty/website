@@ -1,0 +1,13 @@
+#!/bin/bash
+find /home/groovymarty/website/home -type f | while read src; do
+  targ=${src/website\/home\//}
+  if [ -f "$targ" ]; then
+    if [ "$src" -ot "$targ" ]; then
+      echo "$targ has changed, copying to website/home"
+      cp $targ $src
+    elif [ "$targ" -ot "src" ]; then
+      echo "$src has changed, copying to target"
+      cp $src $targ
+    fi
+  fi
+done
