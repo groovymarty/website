@@ -30,12 +30,12 @@ if (array_key_exists('id', $_GET)) {
   }
 
   // use glob to find candidate matches, then compare numbers for exact match
-  // if id has a dash ending, like "-edited", it must match as well (ok if shorter than file's dash ending)
+  // if id has a dash ending, like "-edited", it must occcur as substring in file name
   // if multiple candidates pass these tests, keep the one with the shortest name
   // suppose we have these files:
   // 1) D13X-001.jpg
-  // 2) D13X-001-edited.jpg
-  // 3) D13X-001-edited-again.jpg
+  // 2) D13X-001-xmas-2013-edited.jpg
+  // 3) D13X-001-xmas-2013-edited-again.jpg
   // 4) D13X-010.jpg
   // 5) D13X-100.jpg
   // here are examples showing how we want the matching to work:
@@ -44,7 +44,7 @@ if (array_key_exists('id', $_GET)) {
   // id="D13X-10", glob returns files 4 and 5, file 4 matches the number
   $fixedPart = $dir.'/'.$idParts[1].$idParts[2].'-';
   $fixedPartLen = strlen($fixedPart);
-  $globPat = $fixedPart.'*'.$idParts[3].$idParts[4].'*';
+  $globPat = $fixedPart.'*'.$idParts[3].'*'.$idParts[4].'*';
   $found = "";
   foreach (glob($globPat) as $match) {
     $wildPart= substr($match, $fixedPartLen);

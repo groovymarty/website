@@ -26,6 +26,14 @@ if ($_POST['cmd'] != 'dropboxStatus' && $_POST['verify'] != "ytram") {
       $title="Dropbox Status";
       exec("/home/groovymarty/bin/dropbox.py status", $output, $retval);
       break;
+    case 'syncPush':
+      $title="Sync and Push";
+      exec("/home/groovymarty/bin/syncPush", $output, $retval);
+      break;
+    case 'pullSync':
+      $title="Pull and Sync";
+      exec("/home/groovymarty/bin/pullSync", $output, $retval);
+      break;
     default:
       $title="Error";
       $output=array("No such command: ".$_POST['cmd']);
