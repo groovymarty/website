@@ -26,13 +26,25 @@ if ($_POST['cmd'] != 'dropboxStatus' && $_POST['verify'] != "ytram") {
       $title="Dropbox Status";
       exec("/home/groovymarty/bin/dropbox.py status", $output, $retval);
       break;
-    case 'syncPush':
-      $title="Sync and Push";
-      exec("/home/groovymarty/bin/syncPush", $output, $retval);
+    case 'syncAll':
+      $title="Sync All";
+      exec("/home/groovymarty/bin/syncAll", $output, $retval);
       break;
-    case 'pullSync':
-      $title="Pull and Sync";
-      exec("/home/groovymarty/bin/pullSync", $output, $retval);
+    case 'gitStatus':
+      $title="Git Status";
+      exec("cd /home/groovymarty/website; git status", $output, $retval);
+      break;
+    case 'gitCommit':
+      $title="Git Commit";
+      exec("cd /home/groovymarty/website; git commit -a -F /home/groovymarty/.gitmessage", $output, $retval);
+      break;
+    case 'gitPush':
+      $title="Git Push";
+      exec("cd /home/groovymarty/website; git push", $output, $retval);
+      break;
+    case 'gitPull':
+      $title="Git Pull";
+      exec("cd /home/groovymarty/website; git pull", $output, $retval);
       break;
     default:
       $title="Error";

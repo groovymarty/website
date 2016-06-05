@@ -14,8 +14,11 @@ h2 {font-size: 16pt;}
 <option value="startDropbox">Start Dropbox</option>
 <option value="stopDropbox">Stop Dropbox</option>
 <option value="dropboxStatus" selected>Dropbox Status</option>
-<option value="syncPush">Sync and Push</option>
-<option value="pullSync">Pull and Sync</option>
+<option value="syncAll">Sync Files</option>
+<option value="gitStatus">Git Status</option>
+<option value="gitCommit">Git Commit</option>
+<option value="gitPush">Git Push</option>
+<option value="gitPull">Git Pull</option>
 </select>
 <p>Verify: <input name="verify"/>
 <input type="submit" value="Submit"></p>
