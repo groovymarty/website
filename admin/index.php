@@ -16,6 +16,7 @@ h2 {font-size: 16pt;}
 <option value="dropboxStatus" selected>Dropbox Status</option>
 <option value="syncAll">Sync Files</option>
 <option value="gitStatus">Git Status</option>
+<option value="gitAdd">Git Add</option>
 <option value="gitCommit">Git Commit</option>
 <option value="gitPush">Git Push</option>
 <option value="gitPull">Git Pull</option>

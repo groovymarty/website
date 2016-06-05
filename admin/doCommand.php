@@ -34,9 +34,13 @@ if ($_POST['cmd'] != 'dropboxStatus' && $_POST['verify'] != "ytram") {
       $title="Git Status";
       exec("cd /home/groovymarty/website; git status", $output, $retval);
       break;
+    case 'gitAdd':
+      $title="Git Add";
+      exec("cd /home/groovymarty/website; git add -A", $output, $retval);
+      break;
     case 'gitCommit':
       $title="Git Commit";
-      exec("cd /home/groovymarty/website; git commit -a -F /home/groovymarty/.gitmessage", $output, $retval);
+      exec("cd /home/groovymarty/website; git commit -F /home/groovymarty/.gitmessage", $output, $retval);
       break;
     case 'gitPush':
       $title="Git Push";
@@ -57,7 +61,9 @@ foreach ($output as $line) {
   echo htmlspecialchars($line), "<br>\n";
 }
 if ($retval) {
-  echo "Returned: $retval";
+  echo "Returned: $retval\n";
+} else {
+  echo "Done\n";
 }
 if ($_POST['cmd'] == 'dropboxStatus') { ?>
 <p>
