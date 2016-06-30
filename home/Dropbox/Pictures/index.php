@@ -2,7 +2,7 @@
 $baseDir = '/home/groovymarty/Dropbox/Pictures';
 $baseUrl = 'http://pictures.groovymarty.com';
 $cacheDir = '/home/groovymarty/Pictures_cache';
-$useImagick = false;
+$useImagick = true;
 
 // if no file or id specified, do photo browser
 $id = "";
@@ -109,8 +109,25 @@ if ($width) {
   } else {
     // resize the image and add to cache
     if ($useImagick) {
-      $im->thumbnailImage($width, $height);
-      $im->writeImage($cacheFile);
+      //$im->thumbnailImage($width, $height);
+      $orientation = $im->getImageOrientation();
+      $im->resizeImage($width, $height, Imagick::FILTER_TRIANGLE, 1);
+      switch($orientation) {
+        case Imagick::ORIENTATION_BOTTOMRIGHT:
+          $im->rotateImage("#000", 180); // rotate 180 degrees
+          break;
+        case Imagick::ORIENTATION_RIGHTTOP:
+          $im->rotateImage("#000", 90); // rotate 90 degrees CW
+          break;
+        case Imagick::ORIENTATION_LEFTBOTTOM:
+          $im->rotateImage("#000", -90); // rotate 90 degrees CCW
+          break;
+      }
+      $im->setImageCompression(Imagick::COMPRESSION_JPEG);
+      $im->setImageCompressionQuality(75);
+      $im->stripImage();
+      //$im->setImageOrientation($orient);
+      $im->writeImage($cachePath);
     } else {
       $orig = imagecreatefromjpeg($picPath);
       $scal = imagescale($orig, $width);
@@ -186,29 +203,48 @@ function photo_browser() {
 <meta id="meta" name="viewport" content="width=device-width; initial-scale=1.0" />
 <style>
 body {width: 100%;}
-h1 {font-size: 18pt;}
+h1 {font-size: 18pt; display: inline;}
 h2 {font-size: 16pt;}
 div.picture {padding: 5px 0px 5px 0px;}
+span.bigbold {font-size: 16pt; font-weight: bold;}
 </style>
 </head>
 <body>
 <?php
   echo "<h1>Welcome to <a href=\"$baseUrl\">".substr($baseUrl,7)."</a>!</h1>\n";
   $dir = "";
+  $pat = "";
   $curPath = $baseDir;
   $parent = "";
   $dirParam = "";
   if (array_key_exists('dir', $_GET)) {
     $dir = $_GET['dir'];
     $dirParts = explode("/", $dir);
-    echo "<h2>".htmlentities(array_pop($dirParts))."</h2>\n";
+    $title = array_pop($dirParts);
+    if (count($dirParts)) {
+      print_back("?dir=".urlencode(implode("/", $dirParts)));
+    } else {
+      if (preg_match("/^(D[0-9][0-9]*).*/", $dir, $parts)) {
+        print_back("?pat=".$parts[1]);
+      } else {
+        print_back("?pat=".substr($dir, 0, 1));
+      }
+    }
+    echo "<h2>".htmlentities($title)."</h2>\n";
     $curPath .= '/'.$dir;
     $parent = urlencode($dir).'/';
     $dirParam = '&amp;dir='.urlencode($dir);
-  }
-  $pat = "";
-  if (array_key_exists('pat', $_GET)) {
+  } elseif (array_key_exists('pat', $_GET)) {
     $pat = $_GET['pat'];
+    echo "<!--pat is $pat-->\n";
+    if (strlen($pat) > 1) {
+      print_back("?pat=".substr($pat, 0, 1));
+    } else {
+      print_back($baseUrl);
+    }
+    echo "<p>";
+  } else {
+    echo "<p>";
   }
   $brPending = false;
   $files = array();
@@ -222,7 +258,7 @@ div.picture {padding: 5px 0px 5px 0px;}
         if ($pat == "D" && preg_match("/^(D[0-9][0-9]*).*/", $d, $parts)) {
           $dpat = $parts[1];
           if ($dpat != $lastOne) {
-            echo "<a href=\"?pat=$dpat$dirParam\">$dpat</a>&nbsp;&nbsp;\n";
+            echo "<a href=\"?pat=$dpat$dirParam\">$dpat</a>&nbsp; \n";
             $brPending = true;
             $lastOne = $dpat;
           }
@@ -236,7 +272,7 @@ div.picture {padding: 5px 0px 5px 0px;}
       } else {
         // main directory listing by letters
         if ($let != $lastOne) {
-          echo "<a href=\"?pat=$let$dirParam\">$let</a>&nbsp;&nbsp;\n";
+          echo "<a href=\"?pat=$let$dirParam\">$let</a>&nbsp; \n";
           $brPending = true;
           $lastOne = $let;
         }
@@ -269,11 +305,11 @@ div.picture {padding: 5px 0px 5px 0px;}
     for ($p = 1; $p <= $nPages; $p++) {
       echo "<a href=\"?page=$p$params\">";
       if ($p == $page) {
-        echo "<b>$p</b>";
+        echo "<span class=\"bigbold\">$p</span>";
       } else {
         echo $p;
       }
-      echo "</a>&nbsp;&nbsp;\n";
+      echo "</a>&nbsp; \n";
     }
     echo "<br><br>\n";
   }
@@ -297,4 +333,8 @@ div.picture {padding: 5px 0px 5px 0px;}
     echo "<br><a href=\"?page=", $page+1, "$params\">MORE</a>\n";
   }
   echo "</body></html>\n";
+}
+
+function print_back($url) {
+  echo "&nbsp; <a href=\"$url\">BACK</a>\n";
 }

@@ -41,6 +41,7 @@ if ($_POST['cmd'] != 'dropboxStatus' && $_POST['verify'] != "ytram") {
     case 'gitCommit':
       $title="Git Commit";
       exec("cd /home/groovymarty/website; git commit -F /home/groovymarty/.gitmessage", $output, $retval);
+      file_put_contents("/home/groovymarty/.gitmessage", "Development");
       break;
     case 'gitPush':
       $title="Git Push";
