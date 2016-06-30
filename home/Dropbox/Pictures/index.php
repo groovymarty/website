@@ -2,6 +2,7 @@
 $baseDir = '/home/groovymarty/Dropbox/Pictures';
 $baseUrl = 'http://pictures.groovymarty.com';
 $cacheDir = '/home/groovymarty/Pictures_cache';
+$cacheRequestDir = '/home/groovymarty/Pictures_cache/Request';
 $useImagick = true;
 $inBody = false;
 
@@ -102,11 +103,19 @@ if ($width) {
   // see if resized image is in cache
   // cache filename is relative path to desired picture with underscores for slashes
   // and width inserted
-  $cacheFile = insert_width(strtr(substr($picPath, strlen($baseDir)+1), '/', '_'), $width);
+  $relPath = substr($picPath, strlen($baseDir)+1);
+  $cacheFile = gen_cache_name($relPath, $width, $height);
   $cachePath = $cacheDir.'/'.$cacheFile;
-  if (file_exists($cachePath) && filemtime($cachePath) >= filemtime($picPath)) {
-    // touch file for LRU algorithm
+  $requestPath = $cacheRequestDir.'/'.$cacheFile;
+  if (test_cache($cachePath, $picPath)) {
+    // found file in cache, touch file for LRU algorithm
     touch($cachePath);
+  } elseif (array_key_exists('nowait', $_GET)) {
+    // not in cache and don't want to wait
+    // add request for background process, redirect to "Preparing Image..."
+    touch($requestPath);
+    header("Location: preparing-image.gif");
+    exit();
   } else {
     // resize the image and add to cache
     if ($useImagick) {
@@ -134,6 +143,10 @@ if ($width) {
       imagejpeg($scal, $cachePath);
       imagedestroy($orig);
       imagedestroy($scal);
+    }
+    // delete request file if any
+    if (file_exists($requestPath)) {
+      unlink($requestPath);
     }
   }
   $resultPath = $cachePath;
@@ -174,25 +187,30 @@ function do_glob($what, $path, $prefix) {
     $tailSep = substr($match, strlen($sought), 1);
     if ($tailSep == "" || strpos(" -", $tailSep) !== false) {
       if ($found) {
-        error("$what multiple matches<br>\nglob pattern=$globPat");
+        error(array("$what multiple matches", "glob pattern=$globPat"));
       }
       $found = $match;
     }
   }
   if (!$found) {
-    error("$what not found<br>\nglob pattern=$globPat");
+    error(array("$what not found", "glob pattern=$globPat"));
   }
   return $found;
 }
  
-function error($msg) {
+function error($msgs) {
   global $id, $inBody;
   if (!$inBody) {
     echo "<html><body>\n";
   } else {
     echo "<p>\n";
   }
-  echo htmlentities($msg)."<br>\n";
+  if (!is_array($msgs)) {
+    $msgs = array($msgs);
+  }
+  foreach ($msgs as $msg) {
+    echo htmlentities($msg)."<br>\n";
+  }
   if ($id) {
     echo "id=".htmlentities($id)."<br>\n";
   }
@@ -200,9 +218,33 @@ function error($msg) {
   exit();
 }
 
+// generate cache file name for given relative path
+// replace all underscores with double underscores
+// replace all slashes with single underscores
+// append width and height
+function gen_cache_name($relPath, $width, $height) {
+  $idot = strrpos($relPath, '.');
+  if ($idot !== false) {
+    $str = substr($relPath, 0, $idot);
+    $ext = substr($relPath, $idot);
+  } else {
+    $str = $relPath;
+    $ext = "";
+  }
+  return strtr(str_replace('_', '__', $str), '/', '_').'_'.$width.'x'.$height.$ext;
+}
+
+// reverse what the above function does
+function parse_cache_name($cacheName) {
+}
+
 function insert_width($fileName, $width) {
   $idot = strrpos($fileName, '.');
   return substr($fileName, 0, $idot).'_w'.$width.substr($fileName, $idot);
+}
+
+function test_cache($cachePath, $picPath) {
+  return file_exists($cachePath) && filemtime($cachePath) >= filemtime($picPath);
 }
 
 function photo_browser() {
@@ -342,9 +384,11 @@ span.bigbold {font-size: 16pt; font-weight: bold;}
   }
   $i = ($page - 1) * $nPerPage;
   $iEnd = min($i + $nPerPage, $n);
+  $inNormDir = substr(gen_dir_param($curPath), 0, 5) == "dirid";
+  $noWaitParam = "";
   for (; $i < $iEnd; $i++) {
     $f = $files[$i];
-    if (preg_match("/^([ADEFS][0-9][0-9]*[A-Z]*[0-9]*-[0-9][0-9]*[^\/]*)\.[^.]*/", $f, $parts)) {
+    if ($inNormDir && preg_match("/^([ADEFS][0-9][0-9]*[A-Z]*[0-9]*-[0-9][0-9]*[^\/]*)\.[^.]*/", $f, $parts)) {
       $ref = "id=".urlencode($parts[1]);
       $name = $parts[1];
     } else {
@@ -352,9 +396,11 @@ span.bigbold {font-size: 16pt; font-weight: bold;}
       $ref = "f=".urlencode($relPath);
       $name = $f;
     }
+    
     echo "<div class=\"picture\">\n";
-    echo "<a href=\"?$ref&amp;s=650\"><img src=\"?$ref&amp;s=250\"></a><br>\n";
+    echo "<a href=\"?$ref&amp;s=650\"><img src=\"?$ref&amp;s=250$noWaitParam\"></a><br>\n";
     echo "<a href=\"?$ref\">$name</a></div>\n";
+    #$noWaitParam = "&amp;nowait";
   }
   if ($page < $nPages) {
     echo "<br><a href=\"?page=", $page+1, "$params\">MORE</a>\n";
@@ -373,3 +419,4 @@ function gen_dir_param($dir) {
     return "dir=".urlencode($dir);
   }
 }
+
