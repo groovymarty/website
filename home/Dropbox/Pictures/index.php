@@ -3,6 +3,7 @@ $baseDir = '/home/groovymarty/Dropbox/Pictures';
 $baseUrl = 'http://pictures.groovymarty.com';
 $cacheDir = '/home/groovymarty/Pictures_cache';
 $useImagick = true;
+$inBody = false;
 
 // if no file or id specified, do photo browser
 $id = "";
@@ -109,8 +110,8 @@ if ($width) {
   } else {
     // resize the image and add to cache
     if ($useImagick) {
-      //$im->thumbnailImage($width, $height);
       $orientation = $im->getImageOrientation();
+      //$im->thumbnailImage($width, $height);
       $im->resizeImage($width, $height, Imagick::FILTER_TRIANGLE, 1);
       switch($orientation) {
         case Imagick::ORIENTATION_BOTTOMRIGHT:
@@ -126,7 +127,6 @@ if ($width) {
       $im->setImageCompression(Imagick::COMPRESSION_JPEG);
       $im->setImageCompressionQuality(75);
       $im->stripImage();
-      //$im->setImageOrientation($orient);
       $im->writeImage($cachePath);
     } else {
       $orig = imagecreatefromjpeg($picPath);
@@ -144,6 +144,9 @@ if ($width) {
 
 // generate headers
 header("Content-Type: image/jpeg");
+header("Cache-Control: public; max-age=31536000"); //1 year
+header("Expires: ".gmdate('D, d M Y H:i:s \G\M\T', time()+31536000));
+
 if (array_key_exists('dl', $_GET)) {
   // download option
   $pathParts = explode("/", $picPath);
@@ -183,10 +186,16 @@ function do_glob($what, $path, $prefix) {
 }
  
 function error($msg) {
-  global $id;
-  echo "<html><body>\n";
-  echo "$msg<br>\n";
-  echo "id=$id<br>\n";
+  global $id, $inBody;
+  if (!$inBody) {
+    echo "<html><body>\n";
+  } else {
+    echo "<p>\n";
+  }
+  echo htmlentities($msg)."<br>\n";
+  if ($id) {
+    echo "id=".htmlentities($id)."<br>\n";
+  }
   echo "</body></html>\n";
   exit();
 }
@@ -197,7 +206,7 @@ function insert_width($fileName, $width) {
 }
 
 function photo_browser() {
-  global $baseDir, $baseUrl; ?>
+  global $baseDir, $baseUrl, $inBody; ?>
 <html>
 <head>
 <meta id="meta" name="viewport" content="width=device-width; initial-scale=1.0" />
@@ -211,32 +220,50 @@ span.bigbold {font-size: 16pt; font-weight: bold;}
 </head>
 <body>
 <?php
+  $inBody = true;
   echo "<h1>Welcome to <a href=\"$baseUrl\">".substr($baseUrl,7)."</a>!</h1>\n";
   $dir = "";
   $pat = "";
   $curPath = $baseDir;
   $parent = "";
   $dirParam = "";
-  if (array_key_exists('dir', $_GET)) {
+  if (array_key_exists('dirid', $_GET)) {
+    $dirid = $_GET['dirid'];
+    if (!preg_match('/^([A-Z][A-Z]*[0-9][0-9]*[A-Z]*)([0-9]*).*/', $dirid, $idParts)) {
+      error("Invalid directory id: $dirid");
+    }
+
+    // find parent directory
+    $curPath = do_glob("Parent directory", $baseDir, $idParts[1]);
+
+    // possible child directory
+    if ($idParts[2]) {
+      $curPath = do_glob("Child directory", $curPath, $idParts[1].$idParts[2]);
+    }
+    $dir = substr($curPath, strlen($baseDir)+1);
+  }
+  elseif (array_key_exists('dir', $_GET)) {
     $dir = $_GET['dir'];
+    $curPath .= '/'.$dir;
+  }
+  if ($dir) {
+    if (!is_dir($curPath)) {
+      error("Directory not found: $dir");
+    }
     $dirParts = explode("/", $dir);
     $title = array_pop($dirParts);
     if (count($dirParts)) {
-      print_back("?dir=".urlencode(implode("/", $dirParts)));
+      print_back("?".gen_dir_param(implode("/", $dirParts)));
+    } else if (preg_match("/^(D[0-9][0-9]*).*/", $dir, $parts)) {
+      print_back("?pat=".$parts[1]);
     } else {
-      if (preg_match("/^(D[0-9][0-9]*).*/", $dir, $parts)) {
-        print_back("?pat=".$parts[1]);
-      } else {
-        print_back("?pat=".substr($dir, 0, 1));
-      }
+      print_back("?pat=".substr($dir, 0, 1));
     }
     echo "<h2>".htmlentities($title)."</h2>\n";
-    $curPath .= '/'.$dir;
     $parent = urlencode($dir).'/';
     $dirParam = '&amp;dir='.urlencode($dir);
   } elseif (array_key_exists('pat', $_GET)) {
     $pat = $_GET['pat'];
-    echo "<!--pat is $pat-->\n";
     if (strlen($pat) > 1) {
       print_back("?pat=".substr($pat, 0, 1));
     } else {
@@ -267,7 +294,7 @@ span.bigbold {font-size: 16pt; font-weight: bold;}
             echo "<br><br>\n";
             $brPending = false;
           }
-          echo "<a href=\"?dir=$parent".urlencode($d)."\">$d</a><br>\n";
+          echo "<a href=\"?".gen_dir_param($parent.$d)."\">$d</a><br>\n";
         }
       } else {
         // main directory listing by letters
@@ -297,9 +324,9 @@ span.bigbold {font-size: 16pt; font-weight: bold;}
   if ($nPages > 1) {
     $params = "";
     if ($dir) {
-      $params .= "&amp;dir=".urlencode($dir);
+      $params .= "&amp;".gen_dir_param($dir);
     }
-    if ($pat) {
+    elseif ($pat) {
       $params .= "&amp;pat=$pat";
     }
     for ($p = 1; $p <= $nPages; $p++) {
@@ -337,4 +364,12 @@ span.bigbold {font-size: 16pt; font-weight: bold;}
 
 function print_back($url) {
   echo "&nbsp; <a href=\"$url\">BACK</a>\n";
+}
+
+function gen_dir_param($dir) {
+  if (preg_match("/^([ADEFS][0-9][0-9]*[A-Z]*[0-9]*).*/", basename($dir), $parts)) {
+    return "dirid=".$parts[1];
+  } else {
+    return "dir=".urlencode($dir);
+  }
 }
