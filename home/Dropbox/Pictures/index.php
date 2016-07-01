@@ -74,10 +74,11 @@ if (array_key_exists('id', $_GET)) {
     error("Cache cleared.");
   }
 } elseif (array_key_exists('cacheStats', $_GET)) {
-  system("find $cacheDir -type f | wc -l 2>&1");
-  echo " images in cache<br>";
-  system("ls $requestDir | wc -l 2>&1");
-  echo " requests pending<br>";
+  error(array(
+    count_files($cacheDir)." images in cache",
+    count_files($requestDir)." requests pending"));
+} elseif (array_key_exists('runResize', $_GET) || (is_array($argv) && in_array('runResize', $argv))) {
+  run_resize();
   exit();
 } else {
   photo_browser();
@@ -87,7 +88,7 @@ if (array_key_exists('id', $_GET)) {
 process_image_request($picPath, $_GET);
 exit();
 
-function process_image_request($picPath, $params) {
+function process_image_request($picPath, $params, $emitImage=true) {
   global $baseDir, $cacheDir, $requestDir, $useImagick;
   if ($useImagick) {
     $im = new Imagick($picPath);
@@ -103,7 +104,7 @@ function process_image_request($picPath, $params) {
   // if "s" specified, resize image so largest side = s
   // if "w" specified, resize image so width = w
   // if "h" specified, resize image so height = h
-  $resizeParam = "";
+  $width = 0;
   if (array_key_exists('s', $params)) {
     $side = $params['s'];
     if ($w >= $h) {
@@ -115,22 +116,19 @@ function process_image_request($picPath, $params) {
       $width = round(($w * $side) / $h);
       $height = $side;
     }
-    $resizeParam = "s=$side";
   } elseif (array_key_exists('w', $params)) {
     $width = $params['w'];
     $height = round(($h * $width) / $w);
-    $resizeParam = "w=$width";
   } elseif (array_key_exists('h', $params)) {
     $height = $params['h'];
     $width = round(($w * $height) / $h);
-    $resizeParam = "h=$height";
   }
-  if ($resizeParam) {
+  if ($width) {
     // see if resized image is in cache
     // cache filename is relative path to desired picture with underscores for slashes
     // and width inserted
     $relPath = substr($picPath, strlen($baseDir)+1);
-    $cacheFile = gen_cache_name($relPath, $resizeParam);
+    $cacheFile = gen_cache_name($relPath, $params);
     $cachePath = $cacheDir.'/'.$cacheFile;
     $requestPath = $requestDir.'/'.$cacheFile;
     if (test_cache($cachePath, $picPath)) {
@@ -181,27 +179,24 @@ function process_image_request($picPath, $params) {
     $resultPath = $picPath;
   }
 
-  // generate headers
-  header("Content-Type: image/jpeg");
-  header("Cache-Control: public; max-age=31536000"); //1 year
-  header("Expires: ".gmdate('D, d M Y H:i:s \G\M\T', time()+31536000));
-
-  if (array_key_exists('dl', $params)) {
-    // download option
-    $pathParts = explode("/", $picPath);
-    $fileName = array_pop($pathParts);
-    if ($resizeParam) {
-      // we are resizing, so insert width into file name
-      $fileName = insert_resize_param($fileName, $resizeParam);
-    }
-    header("Content-Disposition: attachment; filename=\"$fileName\"");
-  }
-  header("Content-Length: ".filesize($resultPath));
-
-  // emit the image
-  readfile($resultPath);
   if ($useImagick) {
     $im->clear();
+  }
+  
+  if ($emitImage) {
+    header("Content-Type: image/jpeg");
+    header("Cache-Control: public; max-age=2592000"); //30 days
+    header("Expires: ".gmdate('D, d M Y H:i:s \G\M\T', time()+2592000));
+
+    if (array_key_exists('dl', $params)) {
+      // download option
+      $fileName = insert_resize_params(basename($picPath), $params);
+      header("Content-Disposition: attachment; filename=\"$fileName\"");
+    }
+    header("Content-Length: ".filesize($resultPath));
+
+    // emit the image
+    readfile($resultPath);
   }
 }
   
@@ -248,25 +243,68 @@ function error($msgs) {
 // replace all underscores with double underscores
 // replace all slashes with single underscores
 // append resize param (w=, h= or s=)
-function gen_cache_name($relPath, $resizeParam) {
+function gen_cache_name($relPath, $params) {
   $str = strtr(str_replace('_', '__', $relPath), '/', '_');
-  return insert_resize_param($str, $resizeParam);
+  return insert_resize_params($str, $params);
 }
 
-function insert_resize_param($fileName, $resizeParam) {
+function insert_resize_params($fileName, $params) {
   $idot = strrpos($fileName, '.');
   if ($idot === false) {
     $idot = strlen($fileName);
   }
-  return substr($fileName, 0, $idot).'_'.$resizeParam.substr($fileName, $idot);
+  $str = substr($fileName, 0, $idot);
+  $ext = substr($fileName, $idot);
+
+  foreach (array('w', 'h', 's') as $key) {
+    if (array_key_exists($key, $params)) {
+      $str .= "_".$key."=".$params[$key];
+    }
+  }
+  return $str.$ext;
 }
 
 // reverse what the above functions do
-function parse_cache_name($cacheName) {
+function parse_cache_name($cacheName, &$params) {
+  $idot = strrpos($cacheName, '.');
+  if ($idot === false) {
+    $idot = strlen($cacheName);
+  }
+  $str = substr($cacheName, 0, $idot);
+  $ext = substr($cacheName, $idot);
+  
+  while (preg_match("/(.*)_([a-z][a-z]*)=([0-9][0-9]*)\$/", $str, $parts)) {
+    $str = $parts[1];
+    $params[$parts[2]] = intval($parts[3]);
+  }
+  return strtr(str_replace('__', '/', $str), '/_', '_/').$ext;
 }
 
 function test_cache($cachePath, $picPath) {
   return file_exists($cachePath) && filemtime($cachePath) >= filemtime($picPath);
+}
+
+function count_files($dir) {
+  $n = 0;
+  foreach (scandir($dir) as $d) {
+    if (!is_dir($dir.'/'.$d)) $n++;
+  }
+  return $n;
+}
+
+function run_resize() {
+  global $baseDir, $requestDir;
+  foreach (scandir($requestDir) as $d) {
+    $requestPath = $requestDir.'/'.$d;
+    if (!is_dir($requestPath)) {
+      $params = array();
+      $fileName = parse_cache_name($d, $params);
+      $picPath = $baseDir.'/'.$fileName;
+      if (file_exists($picPath)) {
+        process_image_request($picPath, $params, false);
+      }
+    }
+  }
 }
 
 function photo_browser() {
@@ -407,10 +445,10 @@ span.bigbold {font-size: 16pt; font-weight: bold;}
   $i = ($page - 1) * $nPerPage;
   $iEnd = min($i + $nPerPage, $n);
   $inNormDir = substr(gen_dir_param($curPath), 0, 5) == "dirid";
-  $misses = 0;
   $prep = false;
   for (; $i < $iEnd; $i++) {
     $f = $files[$i];
+    $picPath = $curPath.'/'.$f;
     $relPath = substr($curPath, strlen($baseDir)+1).'/'.$f;
     if ($inNormDir && preg_match("/^([ADEFS][0-9][0-9]*[A-Z]*[0-9]*-[0-9][0-9]*[^\/]*)\.[^.]*/", $f, $parts)) {
       $ref = "id=".urlencode($parts[1]);
@@ -420,13 +458,13 @@ span.bigbold {font-size: 16pt; font-weight: bold;}
       $name = $f;
     }
 
-    $resizeParam = "s=250";    
-    $cacheFile = gen_cache_name($relPath, $resizeParam);
+    $resizeParams = array('s' => 250);    
+    $cacheFile = gen_cache_name($relPath, $resizeParams);
     $cachePath = $cacheDir.'/'.$cacheFile;
     $requestPath = $requestDir.'/'.$cacheFile;
-    if (test_cache($cachePath, $picPath) || ++$misses <= 100) { //<---- HERE
-      // found file in cache, or first miss
-      $thumbSrc = "/?$ref&amp;$resizeParam";
+    if (test_cache($cachePath, $picPath)) {
+      // found file in cache
+      $thumbSrc = "/?$ref&amp;s=250";
     } else {
       $thumbSrc = "/preparing-image.gif";
       touch($requestPath);

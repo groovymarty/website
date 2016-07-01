@@ -9,7 +9,8 @@ h2 {font-size: 16pt;}
 </head>
 <body>
 <?php
-if ($_POST['cmd'] != 'dropboxStatus' && $_POST['verify'] != "ytram") {
+$safeCmds = array('dropboxStatus', 'gitStatus', 'resizeStatus');
+if (!in_array($_POST['cmd'], $safeCmds) && $_POST['verify'] != "ytram") {
   $title = "Error";
   $output = array("Verification failed.");
 } else {
@@ -50,6 +51,18 @@ if ($_POST['cmd'] != 'dropboxStatus' && $_POST['verify'] != "ytram") {
     case 'gitPull':
       $title="Git Pull";
       exec("cd /home/groovymarty/website; git pull", $output, $retval);
+      break;
+    case 'startResize':
+      $title="Start Resize";
+      exec("/home/groovymarty/bin/startResize", $output, $retval);
+      break;
+    case 'stopResize':
+      $title="Stop Resize";
+      exec("/home/groovymarty/bin/stopResize", $output, $retval);
+      break;
+    case 'resizeStatus':
+      $title="Resize Status";
+      exec("/home/groovymarty/bin/resizeStatus", $output, $retval);
       break;
     default:
       $title="Error";

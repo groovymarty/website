@@ -1,0 +1,8 @@
+#!/bin/sh
+pid=`ps -e | grep ' resize$' | awk '{print $1}'`
+if [ -n "$pid" ]; then
+  kill $pid
+  echo "resize stopped"
+else
+  echo "resize is already stopped"
+fi

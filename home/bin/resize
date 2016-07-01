@@ -1,0 +1,9 @@
+#!/bin/sh
+# resize - background service to resize images
+
+while true; do
+  if [ -n "`find /home/groovymarty/Pictures_cache/Requests -type f -print -quit`" ]; then
+    php -f /home/groovymarty/Dropbox/Pictures/index.php runResize
+  fi
+  sleep 1
+done

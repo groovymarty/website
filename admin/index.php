@@ -20,6 +20,9 @@ h2 {font-size: 16pt;}
 <option value="gitCommit">Git Commit</option>
 <option value="gitPush">Git Push</option>
 <option value="gitPull">Git Pull</option>
+<option value="startResize">Start Resize</option>
+<option value="stopResize">Stop Resize</option>
+<option value="resizeStatus">Resize Status</option>
 </select>
 <p>Verify: <input name="verify"/>
 <input type="submit" value="Submit"></p>
