@@ -2,7 +2,7 @@
 $baseDir = '/home/groovymarty/Dropbox/Pictures';
 $baseUrl = 'http://pictures.groovymarty.com';
 $cacheDir = '/home/groovymarty/Pictures_cache';
-$cacheRequestDir = '/home/groovymarty/Pictures_cache/Request';
+$requestDir = '/home/groovymarty/Pictures_cache/Requests';
 $useImagick = true;
 $inBody = false;
 
@@ -65,119 +65,145 @@ if (array_key_exists('id', $_GET)) {
   if (!file_exists($picPath)) {
     error("Sorry, file $f does not exist");
   }
+} elseif (array_key_exists('clearCache', $_GET)) {
+  exec("find $cacheDir -type f -delete 2>&1", $output, $retval);
+  if ($retval) {
+    array_unshift($output, "Failed to clear cache!");
+    error($output);
+  } else {
+    error("Cache cleared.");
+  }
+} elseif (array_key_exists('cacheStats', $_GET)) {
+  system("find $cacheDir -type f | wc -l 2>&1");
+  echo " images in cache<br>";
+  system("ls $requestDir | wc -l 2>&1");
+  echo " requests pending<br>";
+  exit();
 } else {
   photo_browser();
   exit();
 }
 
-if ($useImagick) {
-  $im = new Imagick($picPath);
-  $w = $im->getImageWidth();
-  $h = $im->getImageHeight();
-} else {
-  $info = getimagesize($picPath);
-  $w = $info[0];
-  $h = $info[1];
-}
-
-// possible resize
-// if "s" specified, resize image so largest side = s
-// if "w" specified, resize image so width = w
-$width = "";
-if (array_key_exists('s', $_GET)) {
-  $side = $_GET['s'];
-  if ($w >= $h) {
-    // landscape orientation, set width = side
-    $width = $side;
-    $height = round(($h * $side) / $w);
-  } else {
-    // portrait orientation, set height = side 
-    $width = round(($w * $side) / $h);
-    $height = $side;
-  }
-} elseif (array_key_exists('w', $_GET)) {
-  $width = $_GET['w'];
-  $height = round(($h * $width) / $w);
-}
-if ($width) {
-  // see if resized image is in cache
-  // cache filename is relative path to desired picture with underscores for slashes
-  // and width inserted
-  $relPath = substr($picPath, strlen($baseDir)+1);
-  $cacheFile = gen_cache_name($relPath, $width, $height);
-  $cachePath = $cacheDir.'/'.$cacheFile;
-  $requestPath = $cacheRequestDir.'/'.$cacheFile;
-  if (test_cache($cachePath, $picPath)) {
-    // found file in cache, touch file for LRU algorithm
-    touch($cachePath);
-  } elseif (array_key_exists('nowait', $_GET)) {
-    // not in cache and don't want to wait
-    // add request for background process, redirect to "Preparing Image..."
-    touch($requestPath);
-    header("Location: preparing-image.gif");
-    exit();
-  } else {
-    // resize the image and add to cache
-    if ($useImagick) {
-      $orientation = $im->getImageOrientation();
-      //$im->thumbnailImage($width, $height);
-      $im->resizeImage($width, $height, Imagick::FILTER_TRIANGLE, 1);
-      switch($orientation) {
-        case Imagick::ORIENTATION_BOTTOMRIGHT:
-          $im->rotateImage("#000", 180); // rotate 180 degrees
-          break;
-        case Imagick::ORIENTATION_RIGHTTOP:
-          $im->rotateImage("#000", 90); // rotate 90 degrees CW
-          break;
-        case Imagick::ORIENTATION_LEFTBOTTOM:
-          $im->rotateImage("#000", -90); // rotate 90 degrees CCW
-          break;
-      }
-      $im->setImageCompression(Imagick::COMPRESSION_JPEG);
-      $im->setImageCompressionQuality(75);
-      $im->stripImage();
-      $im->writeImage($cachePath);
-    } else {
-      $orig = imagecreatefromjpeg($picPath);
-      $scal = imagescale($orig, $width);
-      imagejpeg($scal, $cachePath);
-      imagedestroy($orig);
-      imagedestroy($scal);
-    }
-    // delete request file if any
-    if (file_exists($requestPath)) {
-      unlink($requestPath);
-    }
-  }
-  $resultPath = $cachePath;
-} else {
-  // no resize
-  $resultPath = $picPath;
-}
-
-// generate headers
-header("Content-Type: image/jpeg");
-header("Cache-Control: public; max-age=31536000"); //1 year
-header("Expires: ".gmdate('D, d M Y H:i:s \G\M\T', time()+31536000));
-
-if (array_key_exists('dl', $_GET)) {
-  // download option
-  $pathParts = explode("/", $picPath);
-  $fileName = array_pop($pathParts);
-  if ($width) {
-    // we are resizing, so insert width into file name
-    $fileName = insert_width($fileName, $width);
-  }
-  header("Content-Disposition: attachment; filename=\"$fileName\"");
-}
-header("Content-Length: ".filesize($resultPath));
-
-// emit the image
-readfile($resultPath);
-if ($useImagick) {
-  $im->clear();
-}
+process_image_request($picPath, $_GET);
 exit();
+
+function process_image_request($picPath, $params) {
+  global $baseDir, $cacheDir, $requestDir, $useImagick;
+  if ($useImagick) {
+    $im = new Imagick($picPath);
+    $w = $im->getImageWidth();
+    $h = $im->getImageHeight();
+  } else {
+    $info = getimagesize($picPath);
+    $w = $info[0];
+    $h = $info[1];
+  }
+
+  // possible resize
+  // if "s" specified, resize image so largest side = s
+  // if "w" specified, resize image so width = w
+  // if "h" specified, resize image so height = h
+  $resizeParam = "";
+  if (array_key_exists('s', $params)) {
+    $side = $params['s'];
+    if ($w >= $h) {
+      // landscape orientation, set width = side
+      $width = $side;
+      $height = round(($h * $side) / $w);
+    } else {
+      // portrait orientation, set height = side 
+      $width = round(($w * $side) / $h);
+      $height = $side;
+    }
+    $resizeParam = "s=$side";
+  } elseif (array_key_exists('w', $params)) {
+    $width = $params['w'];
+    $height = round(($h * $width) / $w);
+    $resizeParam = "w=$width";
+  } elseif (array_key_exists('h', $params)) {
+    $height = $params['h'];
+    $width = round(($w * $height) / $h);
+    $resizeParam = "h=$height";
+  }
+  if ($resizeParam) {
+    // see if resized image is in cache
+    // cache filename is relative path to desired picture with underscores for slashes
+    // and width inserted
+    $relPath = substr($picPath, strlen($baseDir)+1);
+    $cacheFile = gen_cache_name($relPath, $resizeParam);
+    $cachePath = $cacheDir.'/'.$cacheFile;
+    $requestPath = $requestDir.'/'.$cacheFile;
+    if (test_cache($cachePath, $picPath)) {
+      // found file in cache, touch file for LRU algorithm
+      touch($cachePath);
+    } elseif (array_key_exists('nowait', $params)) {
+      // not in cache and don't want to wait
+      // add request for background process, redirect to "Preparing Image..."
+      touch($requestPath);
+      header("Location: /preparing-image.gif");
+      exit();
+    } else {
+      // resize the image and add to cache
+      if ($useImagick) {
+        $orientation = $im->getImageOrientation();
+        //$im->thumbnailImage($width, $height);
+        $im->resizeImage($width, $height, Imagick::FILTER_TRIANGLE, 1);
+        switch($orientation) {
+          case Imagick::ORIENTATION_BOTTOMRIGHT:
+            $im->rotateImage("#000", 180); // rotate 180 degrees
+            break;
+          case Imagick::ORIENTATION_RIGHTTOP:
+            $im->rotateImage("#000", 90); // rotate 90 degrees CW
+            break;
+          case Imagick::ORIENTATION_LEFTBOTTOM:
+            $im->rotateImage("#000", -90); // rotate 90 degrees CCW
+            break;
+        }
+        $im->setImageCompression(Imagick::COMPRESSION_JPEG);
+        $im->setImageCompressionQuality(75);
+        $im->stripImage();
+        $im->writeImage($cachePath);
+      } else {
+        $orig = imagecreatefromjpeg($picPath);
+        $scal = imagescale($orig, $width);
+        imagejpeg($scal, $cachePath);
+        imagedestroy($orig);
+        imagedestroy($scal);
+      }
+      // delete request file if any
+      if (file_exists($requestPath)) {
+        unlink($requestPath);
+      }
+    }
+    $resultPath = $cachePath;
+  } else {
+    // no resize
+    $resultPath = $picPath;
+  }
+
+  // generate headers
+  header("Content-Type: image/jpeg");
+  header("Cache-Control: public; max-age=31536000"); //1 year
+  header("Expires: ".gmdate('D, d M Y H:i:s \G\M\T', time()+31536000));
+
+  if (array_key_exists('dl', $params)) {
+    // download option
+    $pathParts = explode("/", $picPath);
+    $fileName = array_pop($pathParts);
+    if ($resizeParam) {
+      // we are resizing, so insert width into file name
+      $fileName = insert_resize_param($fileName, $resizeParam);
+    }
+    header("Content-Disposition: attachment; filename=\"$fileName\"");
+  }
+  header("Content-Length: ".filesize($resultPath));
+
+  // emit the image
+  readfile($resultPath);
+  if ($useImagick) {
+    $im->clear();
+  }
+}
   
 function do_glob($what, $path, $prefix) {
   $sought = $path.'/'.$prefix;
@@ -221,26 +247,22 @@ function error($msgs) {
 // generate cache file name for given relative path
 // replace all underscores with double underscores
 // replace all slashes with single underscores
-// append width and height
-function gen_cache_name($relPath, $width, $height) {
-  $idot = strrpos($relPath, '.');
-  if ($idot !== false) {
-    $str = substr($relPath, 0, $idot);
-    $ext = substr($relPath, $idot);
-  } else {
-    $str = $relPath;
-    $ext = "";
-  }
-  return strtr(str_replace('_', '__', $str), '/', '_').'_'.$width.'x'.$height.$ext;
+// append resize param (w=, h= or s=)
+function gen_cache_name($relPath, $resizeParam) {
+  $str = strtr(str_replace('_', '__', $relPath), '/', '_');
+  return insert_resize_param($str, $resizeParam);
 }
 
-// reverse what the above function does
-function parse_cache_name($cacheName) {
-}
-
-function insert_width($fileName, $width) {
+function insert_resize_param($fileName, $resizeParam) {
   $idot = strrpos($fileName, '.');
-  return substr($fileName, 0, $idot).'_w'.$width.substr($fileName, $idot);
+  if ($idot === false) {
+    $idot = strlen($fileName);
+  }
+  return substr($fileName, 0, $idot).'_'.$resizeParam.substr($fileName, $idot);
+}
+
+// reverse what the above functions do
+function parse_cache_name($cacheName) {
 }
 
 function test_cache($cachePath, $picPath) {
@@ -248,7 +270,7 @@ function test_cache($cachePath, $picPath) {
 }
 
 function photo_browser() {
-  global $baseDir, $baseUrl, $inBody; ?>
+  global $baseDir, $baseUrl, $inBody, $cacheDir, $requestDir; ?>
 <html>
 <head>
 <meta id="meta" name="viewport" content="width=device-width; initial-scale=1.0" />
@@ -295,11 +317,11 @@ span.bigbold {font-size: 16pt; font-weight: bold;}
     $dirParts = explode("/", $dir);
     $title = array_pop($dirParts);
     if (count($dirParts)) {
-      print_back("?".gen_dir_param(implode("/", $dirParts)));
+      print_up("/?".gen_dir_param(implode("/", $dirParts)));
     } else if (preg_match("/^(D[0-9][0-9]*).*/", $dir, $parts)) {
-      print_back("?pat=".$parts[1]);
+      print_up("/?pat=".$parts[1]);
     } else {
-      print_back("?pat=".substr($dir, 0, 1));
+      print_up("/?pat=".substr($dir, 0, 1));
     }
     echo "<h2>".htmlentities($title)."</h2>\n";
     $parent = urlencode($dir).'/';
@@ -307,9 +329,9 @@ span.bigbold {font-size: 16pt; font-weight: bold;}
   } elseif (array_key_exists('pat', $_GET)) {
     $pat = $_GET['pat'];
     if (strlen($pat) > 1) {
-      print_back("?pat=".substr($pat, 0, 1));
+      print_up("/?pat=".substr($pat, 0, 1));
     } else {
-      print_back($baseUrl);
+      print_up("/");
     }
     echo "<p>";
   } else {
@@ -327,7 +349,7 @@ span.bigbold {font-size: 16pt; font-weight: bold;}
         if ($pat == "D" && preg_match("/^(D[0-9][0-9]*).*/", $d, $parts)) {
           $dpat = $parts[1];
           if ($dpat != $lastOne) {
-            echo "<a href=\"?pat=$dpat$dirParam\">$dpat</a>&nbsp; \n";
+            echo "<a href=\"/?pat=$dpat$dirParam\">$dpat</a>&nbsp; \n";
             $brPending = true;
             $lastOne = $dpat;
           }
@@ -336,12 +358,12 @@ span.bigbold {font-size: 16pt; font-weight: bold;}
             echo "<br><br>\n";
             $brPending = false;
           }
-          echo "<a href=\"?".gen_dir_param($parent.$d)."\">$d</a><br>\n";
+          echo "<a href=\"/?".gen_dir_param($parent.$d)."\">$d</a><br>\n";
         }
       } else {
         // main directory listing by letters
         if ($let != $lastOne) {
-          echo "<a href=\"?pat=$let$dirParam\">$let</a>&nbsp; \n";
+          echo "<a href=\"/?pat=$let$dirParam\">$let</a>&nbsp; \n";
           $brPending = true;
           $lastOne = $let;
         }
@@ -372,7 +394,7 @@ span.bigbold {font-size: 16pt; font-weight: bold;}
       $params .= "&amp;pat=$pat";
     }
     for ($p = 1; $p <= $nPages; $p++) {
-      echo "<a href=\"?page=$p$params\">";
+      echo "<a href=\"/?page=$p$params\">";
       if ($p == $page) {
         echo "<span class=\"bigbold\">$p</span>";
       } else {
@@ -385,31 +407,50 @@ span.bigbold {font-size: 16pt; font-weight: bold;}
   $i = ($page - 1) * $nPerPage;
   $iEnd = min($i + $nPerPage, $n);
   $inNormDir = substr(gen_dir_param($curPath), 0, 5) == "dirid";
-  $noWaitParam = "";
+  $misses = 0;
+  $prep = false;
   for (; $i < $iEnd; $i++) {
     $f = $files[$i];
+    $relPath = substr($curPath, strlen($baseDir)+1).'/'.$f;
     if ($inNormDir && preg_match("/^([ADEFS][0-9][0-9]*[A-Z]*[0-9]*-[0-9][0-9]*[^\/]*)\.[^.]*/", $f, $parts)) {
       $ref = "id=".urlencode($parts[1]);
       $name = $parts[1];
     } else {
-      $relPath = substr($curPath, strlen($baseDir)+1).'/'.$f;
       $ref = "f=".urlencode($relPath);
       $name = $f;
     }
-    
+
+    $resizeParam = "s=250";    
+    $cacheFile = gen_cache_name($relPath, $resizeParam);
+    $cachePath = $cacheDir.'/'.$cacheFile;
+    $requestPath = $requestDir.'/'.$cacheFile;
+    if (test_cache($cachePath, $picPath) || ++$misses <= 100) { //<---- HERE
+      // found file in cache, or first miss
+      $thumbSrc = "/?$ref&amp;$resizeParam";
+    } else {
+      $thumbSrc = "/preparing-image.gif";
+      touch($requestPath);
+      $prep = true;
+    }
+
     echo "<div class=\"picture\">\n";
-    echo "<a href=\"?$ref&amp;s=650\"><img src=\"?$ref&amp;s=250$noWaitParam\"></a><br>\n";
-    echo "<a href=\"?$ref\">$name</a></div>\n";
-    #$noWaitParam = "&amp;nowait";
+    echo "<a href=\"/?$ref&amp;s=650\"><img src=\"$thumbSrc\"></a><br>\n";
+    echo "<a href=\"/?$ref\">$name</a></div>\n";
   }
   if ($page < $nPages) {
     echo "<br><a href=\"?page=", $page+1, "$params\">MORE</a>\n";
   }
+  if ($prep) { ?>
+<script type="text/javascript">
+window.setTimeout(function(){ window.location="<?=$_SERVER['REQUEST_URI']?>"; },3000);
+</script>
+<?php
+  }
   echo "</body></html>\n";
 }
 
-function print_back($url) {
-  echo "&nbsp; <a href=\"$url\">BACK</a>\n";
+function print_up($url) {
+  echo "&nbsp; <a href=\"$url\">UP</a>\n";
 }
 
 function gen_dir_param($dir) {
