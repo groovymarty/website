@@ -65,6 +65,16 @@ if (array_key_exists('id', $_GET)) {
   if (!file_exists($picPath)) {
     error("Sorry, file $f does not exist");
   }
+} elseif (array_key_exists('req', $_GET)) {
+  // do a requested image resize
+  $req = $_GET['req'];
+  $params = array();
+  $relPath = parse_cache_name($req, $params);
+  $picPath = $baseDir.'/'.$relPath;
+  if (file_exists($picPath)) {
+    process_image_request($picPath, $params, false);
+    exit();
+  }
 } elseif (array_key_exists('clearCache', $_GET)) {
   exec("find $cacheDir -type f -delete 2>&1", $output, $retval);
   if ($retval) {
@@ -78,6 +88,7 @@ if (array_key_exists('id', $_GET)) {
     count_files($cacheDir)." images in cache",
     count_files($requestDir)." requests pending"));
 } elseif (array_key_exists('runResize', $_GET) || (is_array($argv) && in_array('runResize', $argv))) {
+  // experimental
   run_resize();
   exit();
 } else {

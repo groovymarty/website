@@ -1,7 +1,10 @@
 #!/bin/sh
-if ps -e | grep -q ' resize$'; then
+
+# startResize
+
+if ps -e | grep -q ' resizeWorker$'; then
   echo "resize is already running"
 else
-  resize >/dev/null 2>&1 &
+  /home/groovymarty/bin/resizeWorker >/dev/null 2>&1 &
   echo "resize started"
 fi

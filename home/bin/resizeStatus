@@ -1,6 +1,8 @@
 #!/bin/sh
+
 # resizeStatus
-if ps -e | grep -q ' resize$'; then
+
+if ps -e | grep -q ' resizeWorker$'; then
   echo "resize is running"
 else
   echo "resize is stopped"

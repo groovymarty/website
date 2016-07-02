@@ -1,5 +1,8 @@
 #!/bin/sh
-pid=`ps -e | grep ' resize$' | awk '{print $1}'`
+
+# stopResize
+
+pid=`ps -e | grep ' resizeWorker$' | awk '{print $1}'`
 if [ -n "$pid" ]; then
   kill $pid
   echo "resize stopped"
