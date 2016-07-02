@@ -101,43 +101,22 @@ exit();
 
 function process_image_request($picPath, $params, $emitImage=true) {
   global $baseDir, $cacheDir, $requestDir, $useImagick;
-  if ($useImagick) {
-    $im = new Imagick($picPath);
-    $w = $im->getImageWidth();
-    $h = $im->getImageHeight();
-  } else {
-    $info = getimagesize($picPath);
-    $w = $info[0];
-    $h = $info[1];
-  }
-
   // possible resize
   // if "s" specified, resize image so largest side = s
   // if "w" specified, resize image so width = w
   // if "h" specified, resize image so height = h
-  $width = 0;
+  $side = $width = $height = 0;
   if (array_key_exists('s', $params)) {
     $side = $params['s'];
-    if ($w >= $h) {
-      // landscape orientation, set width = side
-      $width = $side;
-      $height = round(($h * $side) / $w);
-    } else {
-      // portrait orientation, set height = side 
-      $width = round(($w * $side) / $h);
-      $height = $side;
-    }
   } elseif (array_key_exists('w', $params)) {
     $width = $params['w'];
-    $height = round(($h * $width) / $w);
   } elseif (array_key_exists('h', $params)) {
     $height = $params['h'];
-    $width = round(($w * $height) / $h);
   }
-  if ($width) {
+  if ($side || $width || $height) {
     // see if resized image is in cache
     // cache filename is relative path to desired picture with underscores for slashes
-    // and width inserted
+    // and resize parameters appended
     $relPath = substr($picPath, strlen($baseDir)+1);
     $cacheFile = gen_cache_name($relPath, $params);
     $cachePath = $cacheDir.'/'.$cacheFile;
@@ -152,10 +131,43 @@ function process_image_request($picPath, $params, $emitImage=true) {
       header("Location: /preparing-image.gif");
       exit();
     } else {
+      // not in cache so must resize now
+      // get original image dimensions
+      if ($useImagick) {
+        $im = new Imagick($picPath);
+        $w = $im->getImageWidth();
+        $h = $im->getImageHeight();
+      } else {
+        $info = getimagesize($picPath);
+        $w = $info[0];
+        $h = $info[1];
+      }
+      if (!$w || !$h) {
+        error("Image dimension is zero");
+      }
+      // compute new image dimensions
+      if ($side) {
+        if ($w >= $h) {
+          // landscape orientation, set width = side
+          $width = $side;
+          $height = round(($h * $side) / $w);
+        } else {
+          // portrait orientation, set height = side 
+          $width = round(($w * $side) / $h);
+          $height = $side;
+        }
+      } elseif ($width) {
+        // width is given so compute height
+        $height = round(($h * $width) / $w);
+      } else {
+        // height is given so compute width
+        $width = round(($w * $height) / $h);
+      }
+
       // resize the image and add to cache
       if ($useImagick) {
+        // apply exif orientation because we're going to strip metadata
         $orientation = $im->getImageOrientation();
-        //$im->thumbnailImage($width, $height);
         $im->resizeImage($width, $height, Imagick::FILTER_TRIANGLE, 1);
         switch($orientation) {
           case Imagick::ORIENTATION_BOTTOMRIGHT:
@@ -172,6 +184,7 @@ function process_image_request($picPath, $params, $emitImage=true) {
         $im->setImageCompressionQuality(75);
         $im->stripImage();
         $im->writeImage($cachePath);
+        $im->clear();
       } else {
         $orig = imagecreatefromjpeg($picPath);
         $scal = imagescale($orig, $width);
@@ -190,17 +203,14 @@ function process_image_request($picPath, $params, $emitImage=true) {
     $resultPath = $picPath;
   }
 
-  if ($useImagick) {
-    $im->clear();
-  }
-  
   if ($emitImage) {
+    // emit headers
     header("Content-Type: image/jpeg");
     header("Cache-Control: public; max-age=2592000"); //30 days
     header("Expires: ".gmdate('D, d M Y H:i:s \G\M\T', time()+2592000));
 
+    // possible download option
     if (array_key_exists('dl', $params)) {
-      // download option
       $fileName = insert_resize_params(basename($picPath), $params);
       header("Content-Disposition: attachment; filename=\"$fileName\"");
     }

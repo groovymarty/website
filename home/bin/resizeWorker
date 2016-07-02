@@ -1,0 +1,29 @@
+#!/bin/sh
+
+# resizeWorker
+# background process to handle image resize requests
+# you can start multiple workers if desired (not sure if it actually helps)
+# resize actually runs in web server, invoked by GET with "req" parameter
+# this turned out to be faster than running php from command line
+
+requestDir=/home/groovymarty/Pictures_cache/Requests
+
+while true; do
+  # find next request
+  reqPath=`find $requestDir -type f -print -quit`
+  if [ -n "$reqPath" ]; then
+    # first delete the request file
+    # might be race with other workers, but only one will successfully delete the file
+    if rm "$reqPath"; then
+      # file deleted successfully, so continue processing the request
+      #echo -n "doing "
+      #basename "$reqPath"
+      req=`basename "$reqPath" | sed -f /home/groovymarty/bin/urlencode.sed`
+      # invoke web server to resize the image and put result in cache
+      wget -q -O /dev/null "pictures.groovymarty.com/?req=$req"
+    fi
+  else
+    # no more requests, sleep and try again later
+    sleep 1
+  fi
+done
