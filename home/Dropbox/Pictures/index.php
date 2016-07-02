@@ -329,7 +329,14 @@ function run_resize() {
 }
 
 function photo_browser() {
-  global $baseDir, $baseUrl, $inBody, $cacheDir, $requestDir; ?>
+  global $baseDir, $baseUrl, $inBody, $cacheDir, $requestDir;
+  // part=0 means generate entire page
+  // part=1 means generate only the list of pictures (during javascript refresh)
+  $part = 0;
+  if (array_key_exists('part', $_GET)) {
+    $part = $_GET['part'];
+  }
+  if (!$part) { ?>
 <html>
 <head>
 <meta id="meta" name="viewport" content="width=device-width; initial-scale=1.0" />
@@ -343,8 +350,9 @@ span.bigbold {font-size: 16pt; font-weight: bold;}
 </head>
 <body>
 <?php
+    echo "<h1>Welcome to <a href=\"$baseUrl\">".substr($baseUrl,7)."</a>!</h1>\n";
+  }
   $inBody = true;
-  echo "<h1>Welcome to <a href=\"$baseUrl\">".substr($baseUrl,7)."</a>!</h1>\n";
   $dir = "";
   $pat = "";
   $curPath = $baseDir;
@@ -375,25 +383,29 @@ span.bigbold {font-size: 16pt; font-weight: bold;}
     }
     $dirParts = explode("/", $dir);
     $title = array_pop($dirParts);
-    if (count($dirParts)) {
-      print_up("/?".gen_dir_param(implode("/", $dirParts)));
-    } else if (preg_match("/^(D[0-9][0-9]*).*/", $dir, $parts)) {
-      print_up("/?pat=".$parts[1]);
-    } else {
-      print_up("/?pat=".substr($dir, 0, 1));
+    if (!$part) {
+      if (count($dirParts)) {
+        print_up("/?".gen_dir_param(implode("/", $dirParts)));
+      } else if (preg_match("/^(D[0-9][0-9]*).*/", $dir, $parts)) {
+        print_up("/?pat=".$parts[1]);
+      } else {
+        print_up("/?pat=".substr($dir, 0, 1));
+      }
+      echo "<h2>".htmlentities($title)."</h2>\n";
     }
-    echo "<h2>".htmlentities($title)."</h2>\n";
     $parent = urlencode($dir).'/';
     $dirParam = '&amp;dir='.urlencode($dir);
   } elseif (array_key_exists('pat', $_GET)) {
     $pat = $_GET['pat'];
-    if (strlen($pat) > 1) {
-      print_up("/?pat=".substr($pat, 0, 1));
-    } else {
-      print_up("/");
+    if (!$part) {
+      if (strlen($pat) > 1) {
+        print_up("/?pat=".substr($pat, 0, 1));
+      } else {
+        print_up("/");
+      }
+      echo "<p>";
     }
-    echo "<p>";
-  } else {
+  } elseif (!$part) {
     echo "<p>";
   }
   $brPending = false;
@@ -403,6 +415,7 @@ span.bigbold {font-size: 16pt; font-weight: bold;}
     $let = substr($d, 0, 1);
     if (!ctype_alpha($let)) continue;
     if (is_dir($curPath.'/'.$d)) {
+      if ($part) continue;
       if ($pat && substr($d, 0, strlen($pat)) != $pat) continue;
       if ($pat || $dir) {
         if ($pat == "D" && preg_match("/^(D[0-9][0-9]*).*/", $d, $parts)) {
@@ -444,24 +457,26 @@ span.bigbold {font-size: 16pt; font-weight: bold;}
   }
   $nPerPage = 40;
   $nPages = ceil($n / $nPerPage);
-  if ($nPages > 1) {
-    $params = "";
-    if ($dir) {
-      $params .= "&amp;".gen_dir_param($dir);
-    }
-    elseif ($pat) {
-      $params .= "&amp;pat=$pat";
-    }
-    for ($p = 1; $p <= $nPages; $p++) {
-      echo "<a href=\"/?page=$p$params\">";
-      if ($p == $page) {
-        echo "<span class=\"bigbold\">$p</span>";
-      } else {
-        echo $p;
+  if (!$part) {
+    if ($nPages > 1) {
+      $params = "";
+      if ($dir) {
+        $params .= "&amp;".gen_dir_param($dir);
+      } elseif ($pat) {
+        $params .= "&amp;pat=$pat";
       }
-      echo "</a>&nbsp; \n";
+      for ($p = 1; $p <= $nPages; $p++) {
+        echo "<a href=\"/?page=$p$params\">";
+        if ($p == $page) {
+          echo "<span class=\"bigbold\">$p</span>";
+        } else {
+          echo $p;
+        }
+        echo "</a>&nbsp; \n";
+      }
+      echo "<br><br>\n";
     }
-    echo "<br><br>\n";
+    echo "<div id=\"piclist\">\n";
   }
   $i = ($page - 1) * $nPerPage;
   $iEnd = min($i + $nPerPage, $n);
@@ -488,7 +503,7 @@ span.bigbold {font-size: 16pt; font-weight: bold;}
       $thumbSrc = "/?$ref&amp;s=250";
     } else {
       $thumbSrc = "/preparing-image.gif";
-      touch($requestPath);
+      if (!$part) touch($requestPath);
       $prep = true;
     }
 
@@ -496,16 +511,52 @@ span.bigbold {font-size: 16pt; font-weight: bold;}
     echo "<a href=\"/?$ref&amp;s=650\"><img src=\"$thumbSrc\"></a><br>\n";
     echo "<a href=\"/?$ref\">$name</a></div>\n";
   }
-  if ($page < $nPages) {
-    echo "<br><a href=\"?page=", $page+1, "$params\">MORE</a>\n";
+  if ($prep) {
+    // as long as this element is present, javascript will keep refreshing
+    echo "<input id=\"prep\" type=\"hidden\" value=\"1\">\n";
   }
-  if ($prep) { ?>
+  if (!$part) {
+    echo "</div>\n"; //piclist
+    if ($page < $nPages) {
+      echo "<br><a href=\"?page=", $page+1, "$params\">MORE</a>\n";
+    }
+    // If any images are being prepared by background resize process,
+    // send the following javascript which refreshes the picture list
+    // every 3 seconds until all images are ready.
+    // The javascript requests this very same page again, but with the
+    // "part" parameter set to 1.  This parameter short-circuits a lot
+    // of the above code so only the picture list is generated.
+    // The response data from this request replaces everything inside
+    // the "piclist" div.  So if there are 40 images in the list, all
+    // 40 of them are replaced, even ones that were already complete.
+    // However the completed images should be in the browser cache,
+    // so the browser should not have to fetch them again.
+    // As the resized images become available, the <img> tags will
+    // point to them and the browser will fetch them.  When all images
+    // are ready, the "prep" hidden field will go away and the javascript
+    // activity will stop.  (Note "prep" is inside the "piclist" div
+    // so it's replaced every time we refresh.)
+    if ($prep) { ?>
 <script type="text/javascript">
-window.setTimeout(function(){ window.location="<?=$_SERVER['REQUEST_URI']?>"; },3000);
+function refreshPicList() {
+  var request = new XMLHttpRequest();
+  request.onreadystatechange = function() { 
+    if (request.readyState == 4 && request.status == 200) {
+      document.getElementById("piclist").innerHTML = request.responseText;
+      if (document.getElementById("prep")) {
+        window.setTimeout(refreshPicList, 3000);
+      }
+    }
+  }
+  request.open("GET", "<?=$_SERVER['REQUEST_URI']?>&part=1", true);
+  request.send(null);
+}
+window.setTimeout(refreshPicList, 3000);
 </script>
 <?php
+    }
+    echo "</body></html>\n";
   }
-  echo "</body></html>\n";
 }
 
 function print_up($url) {
