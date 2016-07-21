@@ -16,7 +16,7 @@ if (array_key_exists('id', $_GET)) {
   // $idParts[3] = "1", the photo number sans leading zeros
   // $idParts[4] = "-edited", optional dash ending (or empty string if none)
   // $idParts[5] = "", dot extension if any (unused)
-  if (!preg_match('/^([A-Z][A-Z]*[0-9][0-9]*[A-Z]*)([0-9]*)-0*([1-9][0-9]*)([^.]*)(.*)/', $id, $idParts)) {
+  if (!preg_match('/^([A-Z][A-Z]*[0-9]*[A-Z]*)([0-9]*)-0*([1-9][0-9]*)([^.]*)(.*)/', $id, $idParts)) {
     error("Invalid id: $id");
   }
 
@@ -360,7 +360,7 @@ span.bigbold {font-size: 16pt; font-weight: bold;}
   $dirParam = "";
   if (array_key_exists('dirid', $_GET)) {
     $dirid = $_GET['dirid'];
-    if (!preg_match('/^([A-Z][A-Z]*[0-9][0-9]*[A-Z]*)([0-9]*).*/', $dirid, $idParts)) {
+    if (!preg_match('/^([A-Z][A-Z]*[0-9]*[A-Z]*)([0-9]*).*/', $dirid, $idParts)) {
       error("Invalid directory id: $dirid");
     }
 
@@ -486,7 +486,7 @@ span.bigbold {font-size: 16pt; font-weight: bold;}
     $f = $files[$i];
     $picPath = $curPath.'/'.$f;
     $relPath = substr($curPath, strlen($baseDir)+1).'/'.$f;
-    if ($inNormDir && preg_match("/^([ADEFS][0-9][0-9]*[A-Z]*[0-9]*-[0-9][0-9]*[^\/]*)\.[^.]*/", $f, $parts)) {
+    if ($inNormDir && preg_match("/^([A-Z][A-Z]*[0-9]*[A-Z]*[0-9]*-[0-9][0-9]*[^\/]*)\.[^.]*/", $f, $parts)) {
       $ref = "id=".urlencode($parts[1]);
       $name = $parts[1];
     } else {
@@ -564,7 +564,7 @@ function print_up($url) {
 }
 
 function gen_dir_param($dir) {
-  if (preg_match("/^([ADEFS][0-9][0-9]*[A-Z]*[0-9]*).*/", basename($dir), $parts)) {
+  if (preg_match("/^([A-Z][A-Z]*[0-9]*[A-Z]*[0-9]*).*/", basename($dir), $parts)) {
     return "dirid=".$parts[1];
   } else {
     return "dir=".urlencode($dir);
