@@ -1,0 +1,13 @@
+#!/bin/sh
+
+# cleanCache
+
+cacheDir=/home/groovymarty/Pictures_cache
+nToKeep=15000
+
+# list cache directory sorted by mod time, most recent first, omit . and ..
+# cut Requests directory from the list
+# cut nToKeep lines from beginning of list
+# translate newlines to NULL characer
+# remove files, using -0 option to avoid problems with quotes and spaces in file names
+ls -tA $cacheDir 2>/dev/null | egrep -v '^Requests$' | tail -n +$((nToKeep+1)) | tr \\n \\0 | xargs -0r /bin/rm
