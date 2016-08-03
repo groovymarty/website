@@ -192,10 +192,10 @@ function process_image_request($picPath, $params, $emitImage=true) {
         imagedestroy($orig);
         imagedestroy($scal);
       }
-      // delete request file if any
-      if (file_exists($requestPath)) {
-        unlink($requestPath);
-      }
+    }
+    // delete request file if any
+    if (file_exists($requestPath)) {
+      unlink($requestPath);
     }
     $resultPath = $cachePath;
   } else {
@@ -417,6 +417,7 @@ span.bigbold {font-size: 16pt; font-weight: bold;}
     if (is_dir($curPath.'/'.$d)) {
       if ($part) continue;
       if ($pat && substr($d, 0, strlen($pat)) != $pat) continue;
+      if (stripos($d, "private")) continue;
       if ($pat || $dir) {
         if ($pat == "D" && preg_match("/^(D[0-9][0-9]*).*/", $d, $parts)) {
           $dpat = $parts[1];
@@ -503,7 +504,7 @@ span.bigbold {font-size: 16pt; font-weight: bold;}
       $thumbSrc = "/?$ref&amp;s=250";
     } else {
       $thumbSrc = "/preparing-image.gif";
-      if (!$part) touch($requestPath);
+      touch($requestPath);
       $prep = true;
     }
 
