@@ -87,10 +87,6 @@ if (array_key_exists('id', $_GET)) {
   error(array(
     count_files($cacheDir)." images in cache",
     count_files($requestDir)." requests pending"));
-} elseif (array_key_exists('runResize', $_GET) || (is_array($argv) && in_array('runResize', $argv))) {
-  // experimental
-  run_resize();
-  exit();
 } else {
   photo_browser();
   exit();
@@ -311,21 +307,6 @@ function count_files($dir) {
     if (!is_dir($dir.'/'.$d)) $n++;
   }
   return $n;
-}
-
-function run_resize() {
-  global $baseDir, $requestDir;
-  foreach (scandir($requestDir) as $d) {
-    $requestPath = $requestDir.'/'.$d;
-    if (!is_dir($requestPath)) {
-      $params = array();
-      $fileName = parse_cache_name($d, $params);
-      $picPath = $baseDir.'/'.$fileName;
-      if (file_exists($picPath)) {
-        process_image_request($picPath, $params, false);
-      }
-    }
-  }
 }
 
 function photo_browser() {
