@@ -313,24 +313,43 @@ function photo_browser() {
   global $baseDir, $baseUrl, $inBody, $cacheDir, $requestDir;
   // part=0 means generate entire page
   // part=1 means generate only the list of pictures (during javascript refresh)
+  // view means full-screen display at specified array index
   $part = 0;
   if (array_key_exists('part', $_GET)) {
     $part = $_GET['part'];
+  }
+  $view = false;
+  if (array_key_exists('view', $_GET)) {
+    $view = true;
+    $iView = intval($_GET['view']);
   }
   if (!$part) { ?>
 <html>
 <head>
 <meta id="meta" name="viewport" content="width=device-width; initial-scale=1.0" />
 <style>
-body {width: 100%;}
+body {width: 100%;<?php if ($view) echo "background: black;"; ?>}
 h1 {font-size: 18pt; display: inline;}
 h2 {font-size: 16pt;}
-div.picture {padding: 5px 0px 5px 0px;}
+div.piclistitem {padding: 5px 0px 5px 0px;}
+img.view {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    max-width: 100%;
+    max-height: 100%;
+    margin: auto;
+    overflow: auto;
+}
 span.bigbold {font-size: 16pt; font-weight: bold;}
 </style>
 </head>
 <body>
 <?php
+  }
+  if (!$view) {
     echo "<h1>Welcome to <a href=\"$baseUrl\">".substr($baseUrl,7)."</a>!</h1>\n";
   }
   $inBody = true;
@@ -364,7 +383,7 @@ span.bigbold {font-size: 16pt; font-weight: bold;}
     }
     $dirParts = explode("/", $dir);
     $title = array_pop($dirParts);
-    if (!$part) {
+    if (!$part && !$view) {
       if (count($dirParts)) {
         print_up("/?".gen_dir_param(implode("/", $dirParts)));
       } else if (preg_match("/^(D[0-9][0-9]*).*/", $dir, $parts)) {
@@ -378,7 +397,7 @@ span.bigbold {font-size: 16pt; font-weight: bold;}
     $dirParam = '&amp;dir='.urlencode($dir);
   } elseif (array_key_exists('pat', $_GET)) {
     $pat = $_GET['pat'];
-    if (!$part) {
+    if (!$part && !$view) {
       if (strlen($pat) > 1) {
         print_up("/?pat=".substr($pat, 0, 1));
       } else {
@@ -386,7 +405,7 @@ span.bigbold {font-size: 16pt; font-weight: bold;}
       }
       echo "<p>";
     }
-  } elseif (!$part) {
+  } elseif (!$part && !$view) {
     echo "<p>";
   }
   $brPending = false;
@@ -396,7 +415,7 @@ span.bigbold {font-size: 16pt; font-weight: bold;}
     $let = substr($d, 0, 1);
     if (!ctype_alpha($let)) continue;
     if (is_dir($curPath.'/'.$d)) {
-      if ($part) continue;
+      if ($part || $view) continue;
       if ($pat && substr($d, 0, strlen($pat)) != $pat) continue;
       if (stripos($d, "private")) continue;
       if ($pat || $dir) {
@@ -437,16 +456,17 @@ span.bigbold {font-size: 16pt; font-weight: bold;}
   if (array_key_exists('page', $_GET)) {
     $page = $_GET['page'];
   }
+  # the parameters that got us here
+  $params = "";
+  if ($dir) {
+    $params .= "&amp;".gen_dir_param($dir);
+  } elseif ($pat) {
+    $params .= "&amp;pat=$pat";
+  }
   $nPerPage = 40;
   $nPages = ceil($n / $nPerPage);
-  if (!$part) {
+  if (!$part && !$view) {
     if ($nPages > 1) {
-      $params = "";
-      if ($dir) {
-        $params .= "&amp;".gen_dir_param($dir);
-      } elseif ($pat) {
-        $params .= "&amp;pat=$pat";
-      }
       for ($p = 1; $p <= $nPages; $p++) {
         echo "<a href=\"/?page=$p$params\">";
         if ($p == $page) {
@@ -460,8 +480,13 @@ span.bigbold {font-size: 16pt; font-weight: bold;}
     }
     echo "<div id=\"piclist\">\n";
   }
-  $i = ($page - 1) * $nPerPage;
-  $iEnd = min($i + $nPerPage, $n);
+  if ($view) {
+    $i = $iView;
+    $iEnd = $iView + 1;
+  } else {
+    $i = ($page - 1) * $nPerPage;
+    $iEnd = min($i + $nPerPage, $n);
+  }
   $inNormDir = substr(gen_dir_param($curPath), 0, 5) == "dirid";
   $prep = false;
   for (; $i < $iEnd; $i++) {
@@ -475,29 +500,32 @@ span.bigbold {font-size: 16pt; font-weight: bold;}
       $ref = "f=".urlencode($relPath);
       $name = $f;
     }
-
-    $resizeParams = array('s' => 250);    
-    $cacheFile = gen_cache_name($relPath, $resizeParams);
-    $cachePath = $cacheDir.'/'.$cacheFile;
-    $requestPath = $requestDir.'/'.$cacheFile;
-    if (test_cache($cachePath, $picPath)) {
-      // found file in cache
-      $thumbSrc = "/?$ref&amp;s=250";
+    
+    if ($view) {
+      echo "<img class=\"view\" src=\"/?$ref&amp;s=650\">\n";
     } else {
-      $thumbSrc = "/preparing-image.gif";
-      touch($requestPath);
-      $prep = true;
+      $resizeParams = array('s' => 250);    
+      $cacheFile = gen_cache_name($relPath, $resizeParams);
+      $cachePath = $cacheDir.'/'.$cacheFile;
+      $requestPath = $requestDir.'/'.$cacheFile;
+      if (test_cache($cachePath, $picPath)) {
+        // found file in cache
+        $thumbSrc = "/?$ref&amp;s=250";
+      } else {
+        $thumbSrc = "/preparing-image.gif";
+        touch($requestPath);
+        $prep = true;
+      }
+      echo "<div class=\"piclistitem\">\n";
+      echo "<a href=\"/?view=$i$params\"><img src=\"$thumbSrc\"></a><br>\n";
+      echo "<a href=\"/?$ref\">$name</a></div>\n";
     }
-
-    echo "<div class=\"picture\">\n";
-    echo "<a href=\"/?$ref&amp;s=650\"><img src=\"$thumbSrc\"></a><br>\n";
-    echo "<a href=\"/?$ref\">$name</a></div>\n";
   }
   if ($prep) {
     // as long as this element is present, javascript will keep refreshing
     echo "<input id=\"prep\" type=\"hidden\" value=\"1\">\n";
   }
-  if (!$part) {
+  if (!$part && !$view) {
     echo "</div>\n"; //piclist
     if ($page < $nPages) {
       echo "<br><a href=\"?page=", $page+1, "$params\">MORE</a>\n";
@@ -537,7 +565,9 @@ window.setTimeout(refreshPicList, 3000);
 </script>
 <?php
     }
-    echo "</body></html>\n";
+  }
+  if (!$part) {
+    echo "</body>\n</html>\n";
   }
 }
 
