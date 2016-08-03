@@ -328,7 +328,7 @@ function photo_browser() {
 <head>
 <meta id="meta" name="viewport" content="width=device-width; initial-scale=1.0" />
 <style>
-body {width: 100%;<?php if ($view) echo "background: black;"; ?>}
+body {width: 100%;<?php if ($view) echo " background: black;"; ?>}
 h1 {font-size: 18pt; display: inline;}
 h2 {font-size: 16pt;}
 div.piclistitem {padding: 5px 0px 5px 0px;}
@@ -349,7 +349,7 @@ span.bigbold {font-size: 16pt; font-weight: bold;}
 <body>
 <?php
   }
-  if (!$view) {
+  if (!$part && !$view) {
     echo "<h1>Welcome to <a href=\"$baseUrl\">".substr($baseUrl,7)."</a>!</h1>\n";
   }
   $inBody = true;
@@ -576,7 +576,7 @@ function print_up($url) {
 }
 
 function gen_dir_param($dir) {
-  if (preg_match("/^([A-Z][A-Z]*[0-9]*[A-Z]*[0-9]*).*/", basename($dir), $parts)) {
+  if (preg_match('/^([A-Z][A-Z]*[0-9]*[A-Z]*[0-9]*)( .*|$)/', basename($dir), $parts)) {
     return "dirid=".$parts[1];
   } else {
     return "dir=".urlencode($dir);
