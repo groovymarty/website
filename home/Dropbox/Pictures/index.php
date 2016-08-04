@@ -538,54 +538,64 @@ var xStart = null;
 var yStart = null;                                                        
 var xEnd = null;
 var yEnd = null;
-document.addEventListener('touchstart', handleTouchStart, false);        
+document.addEventListener('touchstart', handleTouchStart, false);
 document.addEventListener('touchmove', handleTouchMove, false);
 document.addEventListener('touchend', handleTouchEnd, false);
-function handleTouchStart(evt) {                                         
-  xStart = evt.touches[0].clientX;                                      
-  yStart = evt.touches[0].clientY;                                      
-  xEnd = null;
-  yEnd = null;
-};                                                
-function handleTouchMove(evt) {     
-  evt.preventDefault();                                    
-  xEnd = evt.touches[0].clientX;                                      
-  yEnd = evt.touches[0].clientY;                                      
-};                                                
-function handleTouchEnd(evt) {
-  if (!xStart || !yStart || !xEnd || !yEnd) return;
-  var xDiff = xEnd - xStart;
-  var yDiff = yEnd - yStart;
-  if (Math.abs(xDiff) > Math.abs(yDiff)) {
-    var newIndx = indx;
-    if (xDiff < 0) {
-      // left swipe
-      newIndx++;
-    } else {
-      // right swipe
-      newIndx--;
-    }                       
-    if (newIndx < 0 || newIndx >= refs.length) {
-      document.body.style.background = "red";
-      window.setTimeout(setBodyBlack, 500);
-    } else {
-      indx = newIndx;
-      document.getElementById("viewimg").src = "/?" + refs[indx] + "&s=650";
-      document.body.style.background = "#002000";
-    }
-  } else {
-    if (yDiff < 0) {
-      // up swipe
-    } else { 
-      // down swipe
-      window.location = "/?<?=substr(str_replace("&amp;", "&", $params), 1)?>";
-    }                                                                 
+function handleTouchStart(evt) {
+  resetSwipe();
+  if (evt.touches.length == 1) {
+    xStart = evt.touches[0].clientX;
+    yStart = evt.touches[0].clientY;
+    //evt.preventDefault();
   }
+}
+function handleTouchMove(evt) {
+  if (evt.touches.length == 1) {
+    xEnd = evt.touches[0].clientX;
+    yEnd = evt.touches[0].clientY;
+    evt.preventDefault();
+  } else {
+    resetSwipe();
+  }
+}
+function handleTouchEnd(evt) {
+  if (xStart && yStart && xEnd && yEnd) {
+    var xDiff = xEnd - xStart;
+    var yDiff = yEnd - yStart;
+    if (Math.abs(xDiff) > Math.abs(yDiff)) {
+      var newIndx = indx;
+      if (xDiff < 0) {
+        // left swipe
+        newIndx++;
+      } else {
+        // right swipe
+        newIndx--;
+      }
+      if (newIndx < 0 || newIndx >= refs.length) {
+        document.body.style.background = "red";
+        window.setTimeout(setBodyBlack, 500);
+      } else {
+        indx = newIndx;
+        document.getElementById("viewimg").src = "/?" + refs[indx] + "&s=650";
+        document.body.style.background = "#002000";
+      }
+    } else {
+      if (yDiff < 0) {
+        // up swipe
+      } else {
+        // down swipe
+        //window.location = "/?<?=substr(str_replace("&amp;", "&", $params), 1)?>";
+      }
+    }
+  }
+  resetSwipe();
+}
+function resetSwipe() {
   xStart = null;
-  yStart = null;                                             
+  yStart = null;
   xEnd = null;
   yEnd = null;
-};
+}
 document.getElementById("viewimg").onload = setBodyBlack;
 function setBodyBlack() {
   document.body.style.background = "black";
