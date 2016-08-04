@@ -480,9 +480,13 @@ span.bigbold {font-size: 16pt; font-weight: bold;}
     }
     echo "<div id=\"piclist\">\n";
   }
+  if ($page > 1) {
+    $params .= "&amp;page=$page";
+  }
   if ($view) {
-    $i = $iView;
-    $iEnd = $iView + 1;
+    $i = 0;
+    $iEnd = $n;
+    $refs = array();
   } else {
     $i = ($page - 1) * $nPerPage;
     $iEnd = min($i + $nPerPage, $n);
@@ -502,7 +506,10 @@ span.bigbold {font-size: 16pt; font-weight: bold;}
     }
     
     if ($view) {
-      echo "<img class=\"view\" src=\"/?$ref&amp;s=650\">\n";
+      $refs[] = $ref;
+      if ($i == $iView) {
+        echo "<img id=\"viewimg\" class=\"view\" src=\"/?$ref&amp;s=650\">\n";
+      }
     } else {
       $resizeParams = array('s' => 250);    
       $cacheFile = gen_cache_name($relPath, $resizeParams);
@@ -521,32 +528,97 @@ span.bigbold {font-size: 16pt; font-weight: bold;}
       echo "<a href=\"/?$ref\">$name</a></div>\n";
     }
   }
-  if ($prep) {
-    // as long as this element is present, javascript will keep refreshing
-    echo "<input id=\"prep\" type=\"hidden\" value=\"1\">\n";
-  }
-  if (!$part && !$view) {
-    echo "</div>\n"; //piclist
-    if ($page < $nPages) {
-      echo "<br><a href=\"?page=", $page+1, "$params\">MORE</a>\n";
+  if ($view) { ?>
+<script type="text/javascript">
+var indx = <?=$iView?>;
+var refs = [
+<?php foreach ($refs as $ref) echo "\"$ref\",\n"; ?>
+];
+var xStart = null;                                                        
+var yStart = null;                                                        
+var xEnd = null;
+var yEnd = null;
+document.addEventListener('touchstart', handleTouchStart, false);        
+document.addEventListener('touchmove', handleTouchMove, false);
+document.addEventListener('touchend', handleTouchEnd, false);
+function handleTouchStart(evt) {                                         
+  xStart = evt.touches[0].clientX;                                      
+  yStart = evt.touches[0].clientY;                                      
+  xEnd = null;
+  yEnd = null;
+};                                                
+function handleTouchMove(evt) {     
+  evt.preventDefault();                                    
+  xEnd = evt.touches[0].clientX;                                      
+  yEnd = evt.touches[0].clientY;                                      
+};                                                
+function handleTouchEnd(evt) {
+  if (!xStart || !yStart || !xEnd || !yEnd) return;
+  var xDiff = xEnd - xStart;
+  var yDiff = yEnd - yStart;
+  if (Math.abs(xDiff) > Math.abs(yDiff)) {
+    var newIndx = indx;
+    if (xDiff < 0) {
+      // left swipe
+      newIndx++;
+    } else {
+      // right swipe
+      newIndx--;
+    }                       
+    if (newIndx < 0 || newIndx >= refs.length) {
+      document.body.style.background = "red";
+      window.setTimeout(setBodyBlack, 500);
+    } else {
+      indx = newIndx;
+      document.getElementById("viewimg").src = "/?" + refs[indx] + "&s=650";
+      document.body.style.background = "#002000";
     }
-    // If any images are being prepared by background resize process,
-    // send the following javascript which refreshes the picture list
-    // every 3 seconds until all images are ready.
-    // The javascript requests this very same page again, but with the
-    // "part" parameter set to 1.  This parameter short-circuits a lot
-    // of the above code so only the picture list is generated.
-    // The response data from this request replaces everything inside
-    // the "piclist" div.  So if there are 40 images in the list, all
-    // 40 of them are replaced, even ones that were already complete.
-    // However the completed images should be in the browser cache,
-    // so the browser should not have to fetch them again.
-    // As the resized images become available, the <img> tags will
-    // point to them and the browser will fetch them.  When all images
-    // are ready, the "prep" hidden field will go away and the javascript
-    // activity will stop.  (Note "prep" is inside the "piclist" div
-    // so it's replaced every time we refresh.)
-    if ($prep) { ?>
+  } else {
+    if (yDiff < 0) {
+      // up swipe
+    } else { 
+      // down swipe
+      window.location = "/?<?=substr(str_replace("&amp;", "&", $params), 1)?>";
+    }                                                                 
+  }
+  xStart = null;
+  yStart = null;                                             
+  xEnd = null;
+  yEnd = null;
+};
+document.getElementById("viewimg").onload = setBodyBlack;
+function setBodyBlack() {
+  document.body.style.background = "black";
+}
+</script>
+<?php
+  } else {
+    if ($prep) {
+      // as long as this element is present, javascript will keep refreshing
+      echo "<input id=\"prep\" type=\"hidden\" value=\"1\">\n";
+    }
+    if (!$part) {
+      echo "</div>\n"; //piclist
+      if ($page < $nPages) {
+        echo "<br><a href=\"?page=", $page+1, "$params\">MORE</a>\n";
+      }
+      // If any images are being prepared by background resize process,
+      // send the following javascript which refreshes the picture list
+      // every 3 seconds until all images are ready.
+      // The javascript requests this very same page again, but with the
+      // "part" parameter set to 1.  This parameter short-circuits a lot
+      // of the above code so only the picture list is generated.
+      // The response data from this request replaces everything inside
+      // the "piclist" div.  So if there are 40 images in the list, all
+      // 40 of them are replaced, even ones that were already complete.
+      // However the completed images should be in the browser cache,
+      // so the browser should not have to fetch them again.
+      // As the resized images become available, the <img> tags will
+      // point to them and the browser will fetch them.  When all images
+      // are ready, the "prep" hidden field will go away and the javascript
+      // activity will stop.  (Note "prep" is inside the "piclist" div
+      // so it's replaced every time we refresh.)
+      if ($prep) { ?>
 <script type="text/javascript">
 function refreshPicList() {
   var request = new XMLHttpRequest();
@@ -564,6 +636,7 @@ function refreshPicList() {
 window.setTimeout(refreshPicList, 3000);
 </script>
 <?php
+      }
     }
   }
   if (!$part) {
