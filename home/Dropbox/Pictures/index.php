@@ -333,7 +333,7 @@ h1 {font-size: 18pt; display: inline;}
 h2 {font-size: 16pt;}
 div.piclistitem {padding: 5px 0px 5px 0px;}
 img.view {
-    position: fixed;
+    position: absolute;
     top: 0;
     bottom: 0;
     left: 0;
@@ -537,6 +537,17 @@ span.bigbold {font-size: 16pt; font-weight: bold;}
       echo "<a href=\"/?$ref\">$name</a></div>\n";
     }
   }
+  // The following javascript detects swipes for next/previous page.
+  // Swipe detection requires exactly one touch point.  We record start
+  // position and follow movement to end position.  Then subtract
+  // coordinates to distinguish left/right/up/down swipes.
+  // If two or more touch points (like spreading fingers to zoom screen),
+  // our swipe detection gets out of the way.
+  // Swipe detection is disabled while screen is zoomed.  This lets
+  // broswer handle all touch events, so user can move the viewport
+  // across the enlarged image as desired (with one finger).
+  // When user pinches screen back to normal size, swipe detection is
+  // enabled again.
   if ($view) { ?>
 <script type="text/javascript">
 var indx = <?=$iView?>;
@@ -552,14 +563,15 @@ document.addEventListener('touchmove', handleTouchMove, false);
 document.addEventListener('touchend', handleTouchEnd, false);
 function handleTouchStart(evt) {
   resetSwipe();
-  if (evt.touches.length == 1) {
+  // if screen is zoomed, don't intercept any events
+  if (evt.touches.length == 1 && screen.width == window.innerWidth) {
     xStart = evt.touches[0].clientX;
     yStart = evt.touches[0].clientY;
     //evt.preventDefault();
   }
 }
 function handleTouchMove(evt) {
-  if (evt.touches.length == 1) {
+  if (xStart && yStart && evt.touches.length == 1) {
     xEnd = evt.touches[0].clientX;
     yEnd = evt.touches[0].clientY;
     evt.preventDefault();
@@ -600,7 +612,7 @@ function changeImage(bump) {
   var newIndx = indx + bump;
   if (newIndx < 0 || newIndx >= refs.length) {
     document.body.style.background = "red";
-    window.setTimeout(setBodyBlack, 500);
+    window.setTimeout(function(){document.body.style.background = "black"}, 500);
   } else {
     indx = newIndx;
     document.getElementById("viewimg").src = "/?" + refs[indx] + "&s=650";
