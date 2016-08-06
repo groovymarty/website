@@ -328,7 +328,7 @@ function photo_browser() {
 <head>
 <meta id="meta" name="viewport" content="width=device-width; initial-scale=1.0" />
 <style>
-body {width: 100%;<?php if ($view) echo " background: black;"; ?>}
+body {width: 100%; margin: 0px; padding: 0px;<?php if ($view) echo " background: #002000;"; ?>}
 h1 {font-size: 18pt; display: inline;}
 h2 {font-size: 16pt;}
 div.piclistitem {padding: 5px 0px 5px 0px;}
@@ -343,6 +343,7 @@ img.view {
     margin: auto;
     overflow: auto;
 }
+table.view {color: yellow};
 span.bigbold {font-size: 16pt; font-weight: bold;}
 </style>
 </head>
@@ -480,9 +481,10 @@ span.bigbold {font-size: 16pt; font-weight: bold;}
     }
     echo "<div id=\"piclist\">\n";
   }
-  if ($page > 1) {
-    $params .= "&amp;page=$page";
-  }
+  //This was added for down swipe, but it broke the NEXT button..
+  //if ($page > 1) {
+  //  $params .= "&amp;page=$page";
+  //}
   if ($view) {
     $i = 0;
     $iEnd = $n;
@@ -507,8 +509,15 @@ span.bigbold {font-size: 16pt; font-weight: bold;}
     
     if ($view) {
       $refs[] = $ref;
-      if ($i == $iView) {
-        echo "<img id=\"viewimg\" class=\"view\" src=\"/?$ref&amp;s=650\">\n";
+      if ($i == $iView) { ?>
+<img id="viewimg" class="view" src="/?<?=$ref?>&amp;s=650">
+<table class="view">
+  <tr><td onclick="changeImage(-1)"><&nbsp;PREV</td>
+      <td id="loading" width="99%" align="center">LOADING</td>
+      <td onclick="changeImage(1)">NEXT&nbsp;></td>
+  </tr>
+</table>
+<?php
       }
     } else {
       $resizeParams = array('s' => 250);    
@@ -563,21 +572,12 @@ function handleTouchEnd(evt) {
     var xDiff = xEnd - xStart;
     var yDiff = yEnd - yStart;
     if (Math.abs(xDiff) > Math.abs(yDiff)) {
-      var newIndx = indx;
       if (xDiff < 0) {
         // left swipe
-        newIndx++;
+        changeImage(1);
       } else {
         // right swipe
-        newIndx--;
-      }
-      if (newIndx < 0 || newIndx >= refs.length) {
-        document.body.style.background = "red";
-        window.setTimeout(setBodyBlack, 500);
-      } else {
-        indx = newIndx;
-        document.getElementById("viewimg").src = "/?" + refs[indx] + "&s=650";
-        document.body.style.background = "#002000";
+        changeImage(-1);
       }
     } else {
       if (yDiff < 0) {
@@ -596,10 +596,22 @@ function resetSwipe() {
   xEnd = null;
   yEnd = null;
 }
-document.getElementById("viewimg").onload = setBodyBlack;
-function setBodyBlack() {
-  document.body.style.background = "black";
+function changeImage(bump) {
+  var newIndx = indx + bump;
+  if (newIndx < 0 || newIndx >= refs.length) {
+    document.body.style.background = "red";
+    window.setTimeout(setBodyBlack, 500);
+  } else {
+    indx = newIndx;
+    document.getElementById("viewimg").src = "/?" + refs[indx] + "&s=650";
+    setLoading(true);
+  }
 }
+function setLoading(isLoading) {
+  document.getElementById("loading").innerHTML = isLoading ? "LOADING" : "";
+  document.body.style.background = isLoading ? "#002000" : "black";
+}
+document.getElementById("viewimg").onload = function(){setLoading(false);};
 </script>
 <?php
   } else {
