@@ -324,14 +324,22 @@ function photo_browser() {
     $iView = intval($_GET['view']);
   }
   if (!$part) { ?>
+<!doctype html>
 <html>
 <head>
-<meta id="meta" name="viewport" content="width=device-width; initial-scale=1.0" />
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Groovy Pictures</title>
 <style>
-body {width: 100%; margin: 0px; padding: 0px;<?php if ($view) echo " background: #002000;"; ?>}
+<?php if ($view) { ?>
+body {width: 100%; margin: 0px; padding: 0px; background: #002000;}
+<?php } else { ?>
+body {width: 100%; margin: 0px; padding: 5px;}
+<?php } ?>
 h1 {font-size: 18pt; display: inline;}
 h2 {font-size: 16pt;}
-div.piclistitem {padding: 5px 0px 5px 0px;}
+ul.piclist {list-style: none; padding: 0px;}
+li.piclistitem {padding: 5px 0px;}
 img.view {
     position: absolute;
     top: 0;
@@ -343,7 +351,8 @@ img.view {
     margin: auto;
     overflow: auto;
 }
-table.view {color: yellow};
+table.view {color: yellow;}
+td.nav {cursor: pointer;}
 span.bigbold {font-size: 16pt; font-weight: bold;}
 </style>
 </head>
@@ -479,7 +488,7 @@ span.bigbold {font-size: 16pt; font-weight: bold;}
       }
       echo "<br><br>\n";
     }
-    echo "<div id=\"piclist\">\n";
+    echo "<ul class=\"piclist\" id=\"piclist\">\n";
   }
   //This was added for down swipe, but it broke the NEXT button..
   //if ($page > 1) {
@@ -489,6 +498,7 @@ span.bigbold {font-size: 16pt; font-weight: bold;}
     $i = 0;
     $iEnd = $n;
     $refs = array();
+    $names = array();
   } else {
     $i = ($page - 1) * $nPerPage;
     $iEnd = min($i + $nPerPage, $n);
@@ -509,12 +519,13 @@ span.bigbold {font-size: 16pt; font-weight: bold;}
     
     if ($view) {
       $refs[] = $ref;
+      $names[] = $name;
       if ($i == $iView) { ?>
 <img id="viewimg" class="view" src="/?<?=$ref?>&amp;s=650">
 <table class="view">
-  <tr><td onclick="changeImage(-1)"><&nbsp;PREV</td>
+  <tr><td class="nav" onclick="changeImage(-1)">&lt;&nbsp;<u>PREV</u></td>
       <td id="loading" width="99%" align="center">LOADING</td>
-      <td onclick="changeImage(1)">NEXT&nbsp;></td>
+      <td class="nav" onclick="changeImage(1)"><u>NEXT</u>&nbsp;&gt;</td>
   </tr>
 </table>
 <?php
@@ -532,9 +543,9 @@ span.bigbold {font-size: 16pt; font-weight: bold;}
         touch($requestPath);
         $prep = true;
       }
-      echo "<div class=\"piclistitem\">\n";
-      echo "<a href=\"/?view=$i$params\"><img src=\"$thumbSrc\"></a><br>\n";
-      echo "<a href=\"/?$ref\">$name</a></div>\n";
+      echo "<li class=\"piclistitem\">\n";
+      echo "<a href=\"/?view=$i$params\"><img src=\"$thumbSrc\" alt=\"$name\"></a><br>\n";
+      echo "<a href=\"/?$ref\">$name</a></li>\n";
     }
   }
   // The following javascript detects swipes for next/previous page.
@@ -553,6 +564,9 @@ span.bigbold {font-size: 16pt; font-weight: bold;}
 var indx = <?=$iView?>;
 var refs = [
 <?php foreach ($refs as $ref) echo "\"$ref\",\n"; ?>
+];
+var names = [
+<?php foreach ($names as $name) echo "\"$name\",\n"; ?>
 ];
 var xStart = null;                                                        
 var yStart = null;                                                        
@@ -620,7 +634,7 @@ function changeImage(bump) {
   }
 }
 function setLoading(isLoading) {
-  document.getElementById("loading").innerHTML = isLoading ? "LOADING" : "";
+  document.getElementById("loading").innerHTML = isLoading ? "LOADING" : names[indx];
   document.body.style.background = isLoading ? "#002000" : "black";
 }
 document.getElementById("viewimg").onload = function(){setLoading(false);};
@@ -632,7 +646,7 @@ document.getElementById("viewimg").onload = function(){setLoading(false);};
       echo "<input id=\"prep\" type=\"hidden\" value=\"1\">\n";
     }
     if (!$part) {
-      echo "</div>\n"; //piclist
+      echo "</ul>\n"; //piclist
       if ($page < $nPages) {
         echo "<br><a href=\"?page=", $page+1, "$params\">MORE</a>\n";
       }
