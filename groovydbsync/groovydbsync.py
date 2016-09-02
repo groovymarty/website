@@ -24,9 +24,9 @@ from dropbox.files import FileMetadata, FolderMetadata
 TOKEN = 'Qy-em1wdEgUAAAAAAAHVjPV6XQp5uWgcUO3cCICyU8x3lRxd2YcV6cxIvtlsq6Q7'
 
 parser = argparse.ArgumentParser(description='Sync ~/Downloads to Dropbox')
-parser.add_argument('folder', nargs='?', default='',
+parser.add_argument('folder', nargs='?', default='Pictures',
                     help='Folder name in your Dropbox')
-parser.add_argument('rootdir', nargs='?', default='~/Dropbox',
+parser.add_argument('rootdir', nargs='?', default='~/Dropbox/Pictures',
                     help='Local directory to upload')
 parser.add_argument('--token', default=TOKEN,
                     help='Access token '
@@ -95,17 +95,18 @@ def main():
                 else:
                     print(name, 'exists with different stats, downloading')
                     res = download(dbx, folder, subfolder, name)
-                    with open(fullname) as f:
-                        data = f.read()
-                    if res == data:
-                        print(name, 'is already synced [content match]')
-                    else:
-                        print(name, 'has changed since last sync')
-                        if yesno('Refresh %s' % name, False, args):
-                            upload(dbx, fullname, folder, subfolder, name,
-                                   overwrite=True)
-            elif yesno('Upload %s' % name, True, args):
-                upload(dbx, fullname, folder, subfolder, name)
+                    with open(fullname, 'w') as f:
+                        f.write(res)
+                        #data = f.read()
+                    #if res == data:
+                        #print(name, 'is already synced [content match]')
+                    #else:
+                        #print(name, 'has changed since last sync')
+                        #if yesno('Refresh %s' % name, False, args):
+                            #upload(dbx, fullname, folder, subfolder, name,
+                                   #overwrite=True)
+            #elif yesno('Upload %s' % name, True, args):
+                #upload(dbx, fullname, folder, subfolder, name)
 
         # Then choose which subdirectories to traverse.
         keep = []
