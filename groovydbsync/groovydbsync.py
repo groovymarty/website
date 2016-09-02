@@ -21,12 +21,12 @@ import dropbox
 from dropbox.files import FileMetadata, FolderMetadata
 
 # OAuth2 access token.  TODO: login etc.
-TOKEN = ''
+TOKEN = 'Qy-em1wdEgUAAAAAAAHVjPV6XQp5uWgcUO3cCICyU8x3lRxd2YcV6cxIvtlsq6Q7'
 
 parser = argparse.ArgumentParser(description='Sync ~/Downloads to Dropbox')
-parser.add_argument('folder', nargs='?', default='Downloads',
+parser.add_argument('folder', nargs='?', default='',
                     help='Folder name in your Dropbox')
-parser.add_argument('rootdir', nargs='?', default='~/Downloads',
+parser.add_argument('rootdir', nargs='?', default='~/Dropbox',
                     help='Local directory to upload')
 parser.add_argument('--token', default=TOKEN,
                     help='Access token '
