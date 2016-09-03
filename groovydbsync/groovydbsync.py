@@ -12,7 +12,7 @@ basedir = "/home/groovymarty/Dropbox"
 
 cursorfile = "/home/groovymarty/dbox_cursor"
 
-delete_ok = False
+delete_ok = True
 
 cursor = None
 if os.path.isfile(cursorfile):
