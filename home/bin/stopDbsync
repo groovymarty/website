@@ -1,0 +1,11 @@
+#!/bin/sh
+
+# stopDbsync
+
+pid=`ps -e | grep ' dbsyncWorker$' | awk '{print $1}'`
+if [ -n "$pid" ]; then
+  kill $pid
+  echo "dbsync stopped"
+else
+  echo "dbsync is already stopped"
+fi

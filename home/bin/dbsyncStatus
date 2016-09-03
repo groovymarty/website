@@ -1,0 +1,9 @@
+#!/bin/sh
+
+# dbsyncStatus
+
+if ps -e | grep -q ' dbsyncWorker$'; then
+  echo "dbsync is running"
+else
+  echo "dbsync is stopped"
+fi
