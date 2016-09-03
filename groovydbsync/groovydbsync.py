@@ -31,7 +31,7 @@ def scan_dir(relpath):
       lowercase_dir_to_real_dir[relitemlow] = relitem
       scan_dir(relitem)
 
-print("starting groovydbsync")
+print("starting groovydbsync", datetime.datetime.now())
 
 scan_dir("")
  
@@ -117,4 +117,4 @@ cursor = list_files(DropboxClient(token), cursor)
 with open(cursorfile, 'w') as f:
   f.write(cursor)
 
-print("groovydbsync complete")
+print("groovydbsync complete", datetime.datetime.now())
