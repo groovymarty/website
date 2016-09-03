@@ -2,8 +2,11 @@
 
 # dbsyncStatus
 
+ls -l /home/groovymarty/dbox_cursor | awk '{print "Last run completed",$6,$7,$8}'
+
 if ps -e | grep -q ' dbsyncWorker$'; then
   echo "dbsync is running"
 else
   echo "dbsync is stopped"
 fi
+

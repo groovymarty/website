@@ -5,6 +5,6 @@
 if ps -e | grep -q ' dbsyncWorker$'; then
   echo "dbsync is already running"
 else
-  /home/groovymarty/bin/dbsyncWorker >/dev/null 2>&1 &
+  /home/groovymarty/bin/dbsyncWorker >/home/groovymarty/dbsync.log 2>&1 &
   echo "dbsync started"
 fi

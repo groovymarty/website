@@ -2,5 +2,6 @@
 
 # dbsyncWorker
 
+source /home/groovymarty/.bashrc
 cd /home/groovymarty/website/groovydbsync
 python3.4 groovydbsync.py

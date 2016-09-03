@@ -9,23 +9,23 @@ h2 {font-size: 16pt;}
 </head>
 <body>
 <?php
-$safeCmds = array('dropboxStatus', 'gitStatus', 'resizeStatus');
+$safeCmds = array('dbsyncStatus', 'gitStatus', 'resizeStatus');
 if (!in_array($_POST['cmd'], $safeCmds) && $_POST['verify'] != "ytram") {
   $title = "Error";
   $output = array("Verification failed.");
 } else {
   switch ($_POST['cmd']) {
-    case 'startDropbox':
-      $title="Start Dropbox";
-      exec("/home/groovymarty/bin/startDropbox", $output, $retval);
+    case 'startDbsync':
+      $title="Start Dropbox Sync";
+      exec("/home/groovymarty/bin/startDbsync", $output, $retval);
       break;
-    case 'stopDropbox':
-      $title="Stop Dropbox";
-      exec("/home/groovymarty/bin/stopDropbox", $output, $retval);
+    case 'stopDbsync':
+      $title="Stop Dropbox Sync";
+      exec("/home/groovymarty/bin/stopDbsync", $output, $retval);
       break;
-    case 'dropboxStatus':
-      $title="Dropbox Status";
-      exec("/home/groovymarty/bin/dropbox.py status", $output, $retval);
+    case 'dbsyncStatus':
+      $title="Dropbox Sync Status";
+      exec("/home/groovymarty/bin/dbsyncStatus", $output, $retval);
       break;
     case 'syncAll':
       $title="Sync All";

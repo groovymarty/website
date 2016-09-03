@@ -11,9 +11,9 @@ h2 {font-size: 16pt;}
 <form action="doCommand.php" method="post">
 <h1>Welcome to <a href="/">admin.groovymarty.com</a></h1>
 <select name="cmd">
-<option value="startDropbox">Start Dropbox</option>
-<option value="stopDropbox">Stop Dropbox</option>
-<option value="dropboxStatus" selected>Dropbox Status</option>
+<option value="startDbsync">Start Dropbox Sync</option>
+<option value="stopDbsync">Stop Dropbox Sync</option>
+<option value="dbsyncStatus" selected>Dropbox Sync Status</option>
 <option value="syncAll">Sync Files</option>
 <option value="gitStatus">Git Status</option>
 <option value="gitAdd">Git Add</option>
