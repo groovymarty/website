@@ -1,250 +1,120 @@
-"""Upload the contents of your Downloads folder to Dropbox.
-
-This is an example app for API v2.
-"""
-
-from __future__ import print_function
-
-import argparse
-import contextlib
-import datetime
-import os
-import six
+import heapq
 import sys
-import time
-import unicodedata
+import os
+import shutil
+import time, datetime
 
-if sys.version.startswith('2'):
-    input = raw_input
+from dropbox.client import DropboxClient
+ 
+token = "Qy-em1wdEgUAAAAAAAHVjPV6XQp5uWgcUO3cCICyU8x3lRxd2YcV6cxIvtlsq6Q7"
 
-import dropbox
-from dropbox.files import FileMetadata, FolderMetadata
+basedir = "/home/groovymarty/Dropbox"
 
-# OAuth2 access token.  TODO: login etc.
-TOKEN = 'Qy-em1wdEgUAAAAAAAHVjPV6XQp5uWgcUO3cCICyU8x3lRxd2YcV6cxIvtlsq6Q7'
+cursorfile = "/home/groovymarty/dbox_cursor"
 
-parser = argparse.ArgumentParser(description='Sync ~/Downloads to Dropbox')
-parser.add_argument('folder', nargs='?', default='Pictures',
-                    help='Folder name in your Dropbox')
-parser.add_argument('rootdir', nargs='?', default='~/Dropbox/Pictures',
-                    help='Local directory to upload')
-parser.add_argument('--token', default=TOKEN,
-                    help='Access token '
-                    '(see https://www.dropbox.com/developers/apps)')
-parser.add_argument('--yes', '-y', action='store_true',
-                    help='Answer yes to all questions')
-parser.add_argument('--no', '-n', action='store_true',
-                    help='Answer no to all questions')
-parser.add_argument('--default', '-d', action='store_true',
-                    help='Take default answer on all questions')
+delete_ok = False
 
-def main():
-    """Main program.
+cursor = None
+if os.path.isfile(cursorfile):
+  with open(cursorfile, 'r') as f:
+    cursor = f.read()
 
-    Parse command line, then iterate over files and directories under
-    rootdir and upload all files.  Skips some temporary files and
-    directories, and avoids duplicate uploads by comparing size and
-    mtime with the server.
-    """
-    args = parser.parse_args()
-    if sum([bool(b) for b in (args.yes, args.no, args.default)]) > 1:
-        print('At most one of --yes, --no, --default is allowed')
-        sys.exit(2)
-    if not args.token:
-        print('--token is mandatory')
-        sys.exit(2)
+lowercase_dir_to_real_dir = {"": ""}
 
-    folder = args.folder
-    rootdir = os.path.expanduser(args.rootdir)
-    print('Dropbox folder name:', folder)
-    print('Local directory:', rootdir)
-    if not os.path.exists(rootdir):
-        print(rootdir, 'does not exist on your filesystem')
-        sys.exit(1)
-    elif not os.path.isdir(rootdir):
-        print(rootdir, 'is not a foldder on your filesystem')
-        sys.exit(1)
+def scan_dir(relpath):
+  abspath = os.path.join(basedir, relpath)
+  for item in os.listdir(abspath):
+    absitem = os.path.join(abspath, item)
+    if os.path.isdir(absitem):
+      relitem = os.path.join(relpath, item)
+      relitemlow = relitem.lower() 
+      lowercase_dir_to_real_dir[relitemlow] = relitem
+      scan_dir(relitem)
 
-    dbx = dropbox.Dropbox(args.token)
+print("starting groovydbsync")
 
-    for dn, dirs, files in os.walk(rootdir):
-        subfolder = dn[len(rootdir):].strip(os.path.sep)
-        listing = list_folder(dbx, folder, subfolder)
-        print('Descending into', subfolder, '...')
+scan_dir("")
+ 
+def list_files(client, cursor=None):
+  has_more = True
+  reset = False
+ 
+  while has_more:
+    result = client.delta(cursor)
+    cursor = result['cursor']
+    has_more = result['has_more']
+    if result['reset']:
+      reset = True
+ 
+    for lowercase_path, metadata in result['entries']:
 
-        # First do all the files.
-        for name in files:
-            fullname = os.path.join(dn, name)
-            if not isinstance(name, six.text_type):
-                name = name.decode('utf-8')
-            nname = unicodedata.normalize('NFC', name)
-            if name.startswith('.'):
-                print('Skipping dot file:', name)
-            elif name.startswith('@') or name.endswith('~'):
-                print('Skipping temporary file:', name)
-            elif name.endswith('.pyc') or name.endswith('.pyo'):
-                print('Skipping generated file:', name)
-            elif nname in listing:
-                md = listing[nname]
-                mtime = os.path.getmtime(fullname)
-                mtime_dt = datetime.datetime(*time.gmtime(mtime)[:6])
-                size = os.path.getsize(fullname)
-                if (isinstance(md, dropbox.files.FileMetadata) and
-                    mtime_dt == md.client_modified and size == md.size):
-                    print(name, 'is already synced [stats match]')
-                else:
-                    print(name, 'exists with different stats, downloading')
-                    res = download(dbx, folder, subfolder, name)
-                    with open(fullname, 'w') as f:
-                        f.write(res)
-                        #data = f.read()
-                    #if res == data:
-                        #print(name, 'is already synced [content match]')
-                    #else:
-                        #print(name, 'has changed since last sync')
-                        #if yesno('Refresh %s' % name, False, args):
-                            #upload(dbx, fullname, folder, subfolder, name,
-                                   #overwrite=True)
-            #elif yesno('Upload %s' % name, True, args):
-                #upload(dbx, fullname, folder, subfolder, name)
+      lowercase_dir = os.path.dirname(lowercase_path) 
+      lowercase_dir = lowercase_dir.strip('/')
+      filename = os.path.basename(metadata['path']) 
+      if lowercase_dir not in lowercase_dir_to_real_dir:
+        print("not found:", lowercase_dir)
+        exit()
+      real_dir = lowercase_dir_to_real_dir[lowercase_dir]
+      real_path = os.path.join(basedir, real_dir, filename)
 
-        # Then choose which subdirectories to traverse.
-        keep = []
-        for name in dirs:
-            if name.startswith('.'):
-                print('Skipping dot directory:', name)
-            elif name.startswith('@') or name.endswith('~'):
-                print('Skipping temporary directory:', name)
-            elif name == '__pycache__':
-                print('Skipping generated directory:', name)
-            elif yesno('Descend into %s' % name, True, args):
-                print('Keeping directory:', name)
-                keep.append(name)
-            else:
-                print('OK, skipping directory:', name)
-        dirs[:] = keep
+      if metadata is not None:
+        if os.path.isfile(real_path):
+          if metadata['is_dir']:
+            print("local file but dbox is_dir", real_path)
+            exit()
+          # Existing file, if reseting then check metadata otherwise force download
+          download(client, real_path, metadata, reset)
+        elif os.path.isdir(real_path):
+          if not metadata['is_dir']:
+            print("local dir but not dbox is_dir", real_path)
+            exit()
+        else:
+          #print("****NOT FOUND: ", real_path)
+          if metadata['is_dir']:
+            print("making directory", real_path)
+            os.mkdir(real_path)
+          else:
+            # New file, always download
+            download(client, real_path, metadata, False)
+      else:
+        # no metadata indicates a deletion
+        if os.path.isfile(real_path):
+          print("remove file", real_path)
+          if delete_ok:
+            os.remove(real_path)
+        elif os.path.isdir(real_path):
+          print("remove dir", real_path)
+          if delete_ok:
+            shutil.rmtree(real_path)
 
-def list_folder(dbx, folder, subfolder):
-    """List a folder.
+  return cursor
+ 
+def download(client, realpath, metadata, check_metadata):
+  fmt = "%a, %d %b %Y %H:%M:%S +0000"
+  if check_metadata:
+    mtime = os.path.getmtime(realpath)
+    mtime_dt = datetime.datetime(*time.gmtime(mtime)[:6])
+    mtime_str = mtime_dt.strftime(fmt)
+    size = os.path.getsize(realpath)
+    if mtime_str == metadata['client_mtime'] and size == metadata['bytes']:
+      #print("skipping", realpath)
+      return
+    print(mtime_str, metadata['client_mtime'], size, metadata['bytes'])
+  print("downloading", realpath)
+  with open(realpath, 'wb') as flocal:
+    with client.get_file(metadata['path']) as fremote:
+      while True:
+        buf = fremote.read(4096*1024)
+        if not buf:
+          break
+        flocal.write(buf)
+  mtime_dt = datetime.datetime.strptime(metadata['client_mtime'], fmt)
+  mtime = mtime_dt.replace(tzinfo=datetime.timezone.utc).timestamp()
+  os.utime(realpath, (mtime, mtime))
 
-    Return a dict mapping unicode filenames to
-    FileMetadata|FolderMetadata entries.
-    """
-    path = '/%s/%s' % (folder, subfolder.replace(os.path.sep, '/'))
-    while '//' in path:
-        path = path.replace('//', '/')
-    path = path.rstrip('/')
-    try:
-        with stopwatch('list_folder'):
-            res = dbx.files_list_folder(path)
-    except dropbox.exceptions.ApiError as err:
-        print('Folder listing failed for', path, '-- assumped empty:', err)
-        return {}
-    else:
-        rv = {}
-        for entry in res.entries:
-            rv[entry.name] = entry
-        return rv
+cursor = list_files(DropboxClient(token), cursor)
 
-def download(dbx, folder, subfolder, name):
-    """Download a file.
+with open(cursorfile, 'w') as f:
+  f.write(cursor)
 
-    Return the bytes of the file, or None if it doesn't exist.
-    """
-    path = '/%s/%s/%s' % (folder, subfolder.replace(os.path.sep, '/'), name)
-    while '//' in path:
-        path = path.replace('//', '/')
-    with stopwatch('download'):
-        try:
-            md, res = dbx.files_download(path)
-        except dropbox.exceptions.HttpError as err:
-            print('*** HTTP error', err)
-            return None
-    data = res.content
-    print(len(data), 'bytes; md:', md)
-    return data
-
-def upload(dbx, fullname, folder, subfolder, name, overwrite=False):
-    """Upload a file.
-
-    Return the request response, or None in case of error.
-    """
-    path = '/%s/%s/%s' % (folder, subfolder.replace(os.path.sep, '/'), name)
-    while '//' in path:
-        path = path.replace('//', '/')
-    mode = (dropbox.files.WriteMode.overwrite
-            if overwrite
-            else dropbox.files.WriteMode.add)
-    mtime = os.path.getmtime(fullname)
-    with open(fullname, 'rb') as f:
-        data = f.read()
-    with stopwatch('upload %d bytes' % len(data)):
-        try:
-            res = dbx.files_upload(
-                data, path, mode,
-                client_modified=datetime.datetime(*time.gmtime(mtime)[:6]),
-                mute=True)
-        except dropbox.exceptions.ApiError as err:
-            print('*** API error', err)
-            return None
-    print('uploaded as', res.name.encode('utf8'))
-    return res
-
-def yesno(message, default, args):
-    """Handy helper function to ask a yes/no question.
-
-    Command line arguments --yes or --no force the answer;
-    --default to force the default answer.
-
-    Otherwise a blank line returns the default, and answering
-    y/yes or n/no returns True or False.
-
-    Retry on unrecognized answer.
-
-    Special answers:
-    - q or quit exits the program
-    - p or pdb invokes the debugger
-    """
-    if args.default:
-        print(message + '? [auto]', 'Y' if default else 'N')
-        return default
-    if args.yes:
-        print(message + '? [auto] YES')
-        return True
-    if args.no:
-        print(message + '? [auto] NO')
-        return False
-    if default:
-        message += '? [Y/n] '
-    else:
-        message += '? [N/y] '
-    while True:
-        answer = input(message).strip().lower()
-        if not answer:
-            return default
-        if answer in ('y', 'yes'):
-            return True
-        if answer in ('n', 'no'):
-            return False
-        if answer in ('q', 'quit'):
-            print('Exit')
-            raise SystemExit(0)
-        if answer in ('p', 'pdb'):
-            import pdb
-            pdb.set_trace()
-        print('Please answer YES or NO.')
-
-@contextlib.contextmanager
-def stopwatch(message):
-    """Context manager to print how long a block of code took."""
-    t0 = time.time()
-    try:
-        yield
-    finally:
-        t1 = time.time()
-        print('Total elapsed time for %s: %.3f' % (message, t1 - t0))
-
-if __name__ == '__main__':
-    main()
-
-
+print("groovydbsync complete")
