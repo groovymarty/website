@@ -19,7 +19,7 @@ if os.path.isfile(cursorfile):
   with open(cursorfile, 'r') as f:
     cursor = f.read()
 
-lowercase_dir_to_real_dir = {"": ""}
+lowercase_dir_to_real_dir = {"/": basedir}
 
 def scan_dir(relpath):
   abspath = os.path.join(basedir, relpath)
@@ -28,7 +28,7 @@ def scan_dir(relpath):
     if os.path.isdir(absitem):
       relitem = os.path.join(relpath, item)
       relitemlow = relitem.lower() 
-      lowercase_dir_to_real_dir[relitemlow] = relitem
+      lowercase_dir_to_real_dir["/"+relitemlow] = os.path.join(basedir, relitem)
       scan_dir(relitem)
 
 print("starting groovydbsync", datetime.datetime.now())
@@ -48,16 +48,15 @@ def list_files(client, cursor=None):
  
     for lowercase_path, metadata in result['entries']:
 
-      lowercase_dir = os.path.dirname(lowercase_path) 
-      lowercase_dir = lowercase_dir.strip('/')
-      filename = os.path.basename(metadata['path']) 
+      lowercase_dir, lowercase_file = os.path.split(lowercase_path) 
       if lowercase_dir not in lowercase_dir_to_real_dir:
         print("not found:", lowercase_dir)
         exit()
       real_dir = lowercase_dir_to_real_dir[lowercase_dir]
-      real_path = os.path.join(basedir, real_dir, filename)
 
       if metadata is not None:
+        filename = os.path.basename(metadata['path'])
+        real_path = os.path.join(real_dir, filename)
         if os.path.isfile(real_path):
           if metadata['is_dir']:
             print("local file but dbox is_dir", real_path)
@@ -73,19 +72,26 @@ def list_files(client, cursor=None):
           if metadata['is_dir']:
             print("making directory", real_path)
             os.mkdir(real_path)
+            lowercase_dir_to_real_dir[lowercase_path] = real_path
           else:
             # New file, always download
             download(client, real_path, metadata, False)
       else:
         # no metadata indicates a deletion
-        if os.path.isfile(real_path):
-          print("remove file", real_path)
-          if delete_ok:
-            os.remove(real_path)
-        elif os.path.isdir(real_path):
-          print("remove dir", real_path)
-          if delete_ok:
-            shutil.rmtree(real_path)
+        # all we have is lowercase name so we must search for match
+        for item in os.listdir(real_dir):
+          if item.lower() == lowercase_file:
+            real_path = os.path.join(real_dir, item)
+            if os.path.isfile(real_path):
+              print("remove file", real_path)
+              if delete_ok:
+                os.remove(real_path)
+            elif os.path.isdir(real_path):
+              print("remove dir", real_path)
+              if delete_ok:
+                shutil.rmtree(real_path)
+            else:
+              print("*** NOT FOUND TO REMOVE:", real_path)
 
   return cursor
  
