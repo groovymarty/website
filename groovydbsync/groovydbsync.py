@@ -50,7 +50,9 @@ def list_files(client, cursor=None):
 
       lowercase_dir, lowercase_file = os.path.split(lowercase_path) 
       if lowercase_dir not in lowercase_dir_to_real_dir:
+        # This means Dropbox thinks we should have a directory but we don't have it
         print("not found:", lowercase_dir)
+        print("Try again after deleting cursor file to force reset")
         exit()
       real_dir = lowercase_dir_to_real_dir[lowercase_dir]
 
@@ -61,7 +63,7 @@ def list_files(client, cursor=None):
           if metadata['is_dir']:
             print("local file but dbox is_dir", real_path)
             exit()
-          # Existing file, if reseting then check metadata otherwise force download
+          # Existing file, if reseting then check metadata otherwise always download
           download(client, real_path, metadata, reset)
         elif os.path.isdir(real_path):
           if not metadata['is_dir']:
