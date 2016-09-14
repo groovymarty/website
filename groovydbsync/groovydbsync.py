@@ -48,10 +48,12 @@ def list_files(client, cursor=None):
  
     for lowercase_path, metadata in result['entries']:
 
-      lowercase_dir, lowercase_file = os.path.split(lowercase_path) 
+      # Sometimes last element of path is not lowercase, so force it
+      lowercase_path = lowercase_path.lower()
+      lowercase_dir, lowercase_file = os.path.split(lowercase_path)
       if lowercase_dir not in lowercase_dir_to_real_dir:
         # This means Dropbox thinks we should have a directory but we don't have it
-        print("not found:", lowercase_dir)
+        print("dir not found:", lowercase_dir, "for file", lowercase_file, "meta" if metadata is not None else "no meta")
         print("Try again after deleting cursor file to force reset")
         exit()
       real_dir = lowercase_dir_to_real_dir[lowercase_dir]
