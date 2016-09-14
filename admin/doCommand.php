@@ -9,7 +9,7 @@ h2 {font-size: 16pt;}
 </head>
 <body>
 <?php
-$safeCmds = array('dbsyncStatus', 'gitStatus', 'resizeStatus');
+$safeCmds = array('dbsyncStatus', 'dbsyncLog', 'gitStatus', 'resizeStatus');
 if (!in_array($_POST['cmd'], $safeCmds) && $_POST['verify'] != "ytram") {
   $title = "Error";
   $output = array("Verification failed.");
@@ -26,6 +26,11 @@ if (!in_array($_POST['cmd'], $safeCmds) && $_POST['verify'] != "ytram") {
     case 'dbsyncStatus':
       $title="Dropbox Sync Status";
       exec("/home/groovymarty/bin/dbsyncStatus", $output, $retval);
+      break;
+    case 'dbsyncLog':
+      $title="Dropbox Sync Log";
+      $output = file("/home/groovymarty/dbsync.log");
+      $retval = 0;
       break;
     case 'syncAll':
       $title="Sync All";

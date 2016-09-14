@@ -14,6 +14,7 @@ h2 {font-size: 16pt;}
 <option value="startDbsync">Start Dropbox Sync</option>
 <option value="stopDbsync">Stop Dropbox Sync</option>
 <option value="dbsyncStatus" selected>Dropbox Sync Status</option>
+<option value="dbsyncLog">Dropbox Sync Log</option>
 <option value="syncAll">Sync Files</option>
 <option value="gitStatus">Git Status</option>
 <option value="gitAdd">Git Add</option>
