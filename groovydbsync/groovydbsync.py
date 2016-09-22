@@ -54,8 +54,12 @@ def list_files(client, cursor=None):
       if lowercase_dir not in lowercase_dir_to_real_dir:
         # This means Dropbox thinks we should have a directory but we don't have it
         print("dir not found:", lowercase_dir, "for file", lowercase_file, "meta" if metadata is not None else "no meta")
-        print("Try again after deleting cursor file to force reset")
-        exit()
+        if metadata is not None:
+          print("Try again after deleting cursor file to force reset")
+          exit()
+        else:
+          print("Ignore and keep going because file was to be deleted anyway")
+          continue
       real_dir = lowercase_dir_to_real_dir[lowercase_dir]
 
       if metadata is not None:
