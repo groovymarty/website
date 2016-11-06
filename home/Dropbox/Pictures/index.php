@@ -10,10 +10,56 @@ $inBody = false;
 $id = "";
 if (array_key_exists('id', $_GET)) {
   $id = $_GET['id'];
-  $picPath = find_picture($id);
-  if (!$picPath) {
+  // parse id, for example "D13P2-001-edited" gives:
+  // $idParts[1] = "D13P", the parent directory
+  // $idParts[2] = "2", the child directory (or empty string if none)
+  // $idParts[3] = "1", the photo number sans leading zeros
+  // $idParts[4] = "-edited", optional dash ending (or empty string if none)
+  // $idParts[5] = "", dot extension if any (unused)
+  if (!preg_match('/^([A-Z][A-Z]*[0-9]*[A-Z]*)(_?[0-9]*)-0*([1-9][0-9]*)([^.]*)(.*)/', $id, $idParts)) {
+    error("Invalid id: $id");
+  }
+
+  // find parent directory
+  $dir = do_glob("Parent directory", $baseDir, $idParts[1]);
+
+  // possible child directory
+  if ($idParts[2]) {
+    $dir = do_glob("Child directory", $dir, $idParts[1].$idParts[2]);
+  }
+  if (!is_dir($dir)) {
+    error("$dir is not a directory!");
+  }
+
+  // use glob to find candidate matches, then compare numbers for exact match
+  // if id has a dash ending, like "-edited", it must occcur as substring in file name
+  // if multiple candidates pass these tests, keep the one with the shortest name
+  // suppose we have these files:
+  // 1) D13X-001.jpg
+  // 2) D13X-001-xmas-2013-edited.jpg
+  // 3) D13X-001-xmas-2013-edited-again.jpg
+  // 4) D13X-010.jpg
+  // 5) D13X-100.jpg
+  // here are examples showing how we want the matching to work:
+  // id="D13X-1", glob returns all 5 files, files 1,2,3 match the number, pick 1 because it's shortest
+  // id="D13X-1-ed", glob returns files 2 and 3, pick 2 because it's shortest
+  // id="D13X-10", glob returns files 4 and 5, file 4 matches the number
+  $fixedPart = $dir.'/'.$idParts[1].$idParts[2].'-';
+  $fixedPartLen = strlen($fixedPart);
+  $globPat = $fixedPart.'*'.$idParts[3].'*'.$idParts[4].'*';
+  $found = "";
+  foreach (glob($globPat) as $match) {
+    $wildPart= substr($match, $fixedPartLen);
+    if (preg_match("/^0*([1-9][0-9]*).*/", $wildPart, $num) && $num[1] == $idParts[3]) {
+      if (!$found || strlen($match) < strlen($found)) {
+        $found = $match;
+      }
+    }
+  }
+  if (!$found) {
     error("Sorry, picture $id not found");
   }
+  $picPath = $found;
 } elseif (array_key_exists('f', $_GET)) {
   $picPath = $baseDir.'/'.$_GET['f'];
   if (!file_exists($picPath)) {
@@ -170,74 +216,7 @@ function process_image_request($picPath, $params, $emitImage=true) {
     readfile($resultPath);
   }
 }
-
-function find_picture($id) {
-  global $baseDir;
-  // parse id, for example "D13P2-001-edited" gives:
-  // $idParts[1] = "D13P", the parent directory
-  // $idParts[2] = "2", the child directory (or empty string if none)
-  // $idParts[3] = "1", the photo number sans leading zeros
-  // $idParts[4] = "-edited", optional dash ending (or empty string if none)
-  // $idParts[5] = "", dot extension if any (unused)
-  if (!preg_match('/^([A-Z][A-Z]*[0-9]*[A-Z]*)([0-9]*)-0*([1-9][0-9]*)([^.]*)(.*)/', $id, $idParts)) {
-    error("Invalid id: $id");
-  }
-
-  // find parent directory
-  $dir = do_glob("Parent directory", $baseDir, $idParts[1]);
-
-  // possible child directory
-  if ($idParts[2]) {
-    $dir = do_glob("Child directory", $dir, $idParts[1].$idParts[2]);
-  }
-  if (!is_dir($dir)) {
-    error("$dir is not a directory!");
-  }
-
-  // use glob to find candidate matches, then compare numbers for exact match
-  // if id has a dash ending, like "-edited", it must occcur as substring in file name
-  // if multiple candidates pass these tests, keep the one with the shortest name
-  // suppose we have these files:
-  // 1) D13X-001.jpg
-  // 2) D13X-001-xmas-2013-edited.jpg
-  // 3) D13X-001-xmas-2013-edited-again.jpg
-  // 4) D13X-010.jpg
-  // 5) D13X-100.jpg
-  // here are examples showing how we want the matching to work:
-  // id="D13X-1", glob returns all 5 files, files 1,2,3 match the number, pick 1 because it's shortest
-  // id="D13X-1-ed", glob returns files 2 and 3, pick 2 because it's shortest
-  // id="D13X-10", glob returns files 4 and 5, file 4 matches the number
-  $fixedPart = $dir.'/'.$idParts[1].$idParts[2].'-';
-  $fixedPartLen = strlen($fixedPart);
-  $globPat = $fixedPart.'*'.$idParts[3].'*'.$idParts[4].'*';
-  $found = "";
-  foreach (glob($globPat) as $match) {
-    $wildPart= substr($match, $fixedPartLen);
-    if (preg_match("/^0*([1-9][0-9]*).*/", $wildPart, $num) && $num[1] == $idParts[3]) {
-      if (!$found || strlen($match) < strlen($found)) {
-        $found = $match;
-      }
-    }
-  }
-  return $found;
-}
-
-function find_dir($dirid) {
-  global $baseDir;
-  if (!preg_match('/^([A-Z][A-Z]*[0-9]*[A-Z]*)([0-9]*).*/', $dirid, $idParts)) {
-    error("Invalid directory id: $dirid");
-  }
-
-  // find parent directory
-  $curPath = do_glob("Parent directory", $baseDir, $idParts[1]);
-
-  // possible child directory
-  if ($idParts[2]) {
-    $curPath = do_glob("Child directory", $curPath, $idParts[1].$idParts[2]);
-  }
-  return $curPath;
-}
-
+  
 function do_glob($what, $path, $prefix) {
   $sought = $path.'/'.$prefix;
   $globPat = $sought.'*';
@@ -361,7 +340,6 @@ h1 {font-size: 18pt; display: inline;}
 h2 {font-size: 16pt;}
 ul.piclist {list-style: none; padding: 0px;}
 li.piclistitem {padding: 5px 0px;}
-.reference {font-style: italic;}
 img.view {
     position: absolute;
     top: 0;
@@ -392,7 +370,17 @@ span.bigbold {font-size: 16pt; font-weight: bold;}
   $dirParam = "";
   if (array_key_exists('dirid', $_GET)) {
     $dirid = $_GET['dirid'];
-    $curPath = find_dir($dirid);
+    if (!preg_match('/^([A-Z][A-Z]*[0-9]*[A-Z]*)(_?[0-9]*).*/', $dirid, $idParts)) {
+      error("Invalid directory id: $dirid");
+    }
+
+    // find parent directory
+    $curPath = do_glob("Parent directory", $baseDir, $idParts[1]);
+
+    // possible child directory
+    if ($idParts[2]) {
+      $curPath = do_glob("Child directory", $curPath, $idParts[1].$idParts[2]);
+    }
     $dir = substr($curPath, strlen($baseDir)+1);
   }
   elseif (array_key_exists('dir', $_GET)) {
@@ -432,13 +420,8 @@ span.bigbold {font-size: 16pt; font-weight: bold;}
   }
   $brPending = false;
   $files = array();
-  $refsFile = "";
   $lastOne = "";
   foreach (scandir($curPath) as $d) {
-    if ($d == "_Refs") {
-      $refsFile = $curPath.'/'.$d;
-      continue;
-    }
     $let = substr($d, 0, 1);
     if (!ctype_alpha($let)) continue;
     if (is_dir($curPath.'/'.$d)) {
@@ -470,7 +453,7 @@ span.bigbold {font-size: 16pt; font-weight: bold;}
       }
     } else {
       if (strtolower(substr($d, -4)) == ".jpg") {
-        $files[] = $curPath.'/'.$d;
+        $files[] = $d;
       }
     }
   }
@@ -478,37 +461,6 @@ span.bigbold {font-size: 16pt; font-weight: bold;}
     echo "<br><br>\n";
     $brPending = false;
   }
-
-  $nRealFiles = count($files);
-  if ($refsFile) {
-    $f = fopen($refsFile, "r");
-    if (!$f) {
-      error("can't open refsFile=$refsFile");
-    }
-    while (!feof($f)) {
-      $line = trim(fgets($f));
-      if (!$line) continue;
-      if (substr($line, 0, 1) == "/") {
-        // directory id
-        if ($part || $view) continue;
-        $dirid = substr($line, 1);
-        $dirPath = find_dir($dirid);
-        if ($dirPath) {
-          echo "<a href=\"/?dirid=$dirid\"><i>".basename($dirPath)."</i></a><br>\n";
-        }
-      } else {
-        // picture id
-        global $id;
-        $id = $line;
-        $picPath = find_picture($id);
-        if ($picPath) {
-          $files[] = $picPath;
-        }
-      }
-    }
-    fclose($f);
-  }
-    
   $n = count($files);
   $page = 1;
   if (array_key_exists('page', $_GET)) {
@@ -545,7 +497,7 @@ span.bigbold {font-size: 16pt; font-weight: bold;}
   if ($view) {
     $i = 0;
     $iEnd = $n;
-    $picParms = array();
+    $refs = array();
     $names = array();
   } else {
     $i = ($page - 1) * $nPerPage;
@@ -554,22 +506,22 @@ span.bigbold {font-size: 16pt; font-weight: bold;}
   $inNormDir = substr(gen_dir_param($curPath), 0, 5) == "dirid";
   $prep = false;
   for (; $i < $iEnd; $i++) {
-    $isRef = $i >= $nRealFiles;
-    $picPath = $files[$i];
-    $relPath = substr($picPath, strlen($baseDir)+1);
-    $name = basename($picPath);
-    if ($inNormDir && preg_match("/^([A-Z][A-Z]*[0-9]*[A-Z]*[0-9]*-[0-9][0-9]*[^\/]*)\.[^.]*/", $name, $parts)) {
-      $picParm = "id=".urlencode($parts[1]);
+    $f = $files[$i];
+    $picPath = $curPath.'/'.$f;
+    $relPath = substr($curPath, strlen($baseDir)+1).'/'.$f;
+    if ($inNormDir && preg_match("/^([A-Z][A-Z]*[0-9]*[A-Z]*_?[0-9]*-[0-9][0-9]*[^\/]*)\.[^.]*/", $f, $parts)) {
+      $ref = "id=".urlencode($parts[1]);
       $name = $parts[1];
     } else {
-      $picParm = "f=".urlencode($relPath);
+      $ref = "f=".urlencode($relPath);
+      $name = $f;
     }
     
     if ($view) {
-      $picParms[] = $picParm;
+      $refs[] = $ref;
       $names[] = $name;
       if ($i == $iView) { ?>
-<img id="viewimg" class="view" src="/?<?=$picParm?>&amp;s=650">
+<img id="viewimg" class="view" src="/?<?=$ref?>&amp;s=650">
 <table class="view">
   <tr><td class="nav" onclick="changeImage(-1)">&lt;&nbsp;<u>PREV</u></td>
       <td id="loading" width="99%" align="center">LOADING</td>
@@ -585,19 +537,15 @@ span.bigbold {font-size: 16pt; font-weight: bold;}
       $requestPath = $requestDir.'/'.$cacheFile;
       if (test_cache($cachePath, $picPath)) {
         // found file in cache
-        $thumbSrc = "/?$picParm&amp;s=250";
+        $thumbSrc = "/?$ref&amp;s=250";
       } else {
         $thumbSrc = "/preparing-image.gif";
         touch($requestPath);
         $prep = true;
       }
-      echo "<li class=\"piclistitem";
-      if ($isRef) {
-        echo " reference";
-      }
-      echo "\">\n";
+      echo "<li class=\"piclistitem\">\n";
       echo "<a href=\"/?view=$i$params\"><img src=\"$thumbSrc\" alt=\"$name\"></a><br>\n";
-      echo "<a href=\"/?$picParm\">$name</a></li>\n";
+      echo "<a href=\"/?$ref\">$name</a></li>\n";
     }
   }
   // The following javascript detects swipes for next/previous page.
@@ -614,8 +562,8 @@ span.bigbold {font-size: 16pt; font-weight: bold;}
   if ($view) { ?>
 <script type="text/javascript">
 var indx = <?=$iView?>;
-var picParms = [
-<?php foreach ($picParms as $picParm) echo "\"$picParm\",\n"; ?>
+var refs = [
+<?php foreach ($refs as $ref) echo "\"$ref\",\n"; ?>
 ];
 var names = [
 <?php foreach ($names as $name) echo "\"$name\",\n"; ?>
@@ -676,21 +624,17 @@ function resetSwipe() {
 }
 function changeImage(bump) {
   var newIndx = indx + bump;
-  if (newIndx < 0 || newIndx >= picParms.length) {
+  if (newIndx < 0 || newIndx >= refs.length) {
     document.body.style.background = "red";
     window.setTimeout(function(){document.body.style.background = "black"}, 500);
   } else {
     indx = newIndx;
-    document.getElementById("viewimg").src = "/?" + picParms[indx] + "&s=650";
+    document.getElementById("viewimg").src = "/?" + refs[indx] + "&s=650";
     setLoading(true);
   }
 }
 function setLoading(isLoading) {
-  name = names[indx];
-  if (indx >= <?=$nRealFiles?>) {
-    name = "<i>"+name+"</i>";
-  }
-  document.getElementById("loading").innerHTML = isLoading ? "LOADING" : name;
+  document.getElementById("loading").innerHTML = isLoading ? "LOADING" : names[indx];
   document.body.style.background = isLoading ? "#002000" : "black";
 }
 document.getElementById("viewimg").onload = function(){setLoading(false);};
@@ -753,7 +697,7 @@ function print_up($url) {
 }
 
 function gen_dir_param($dir) {
-  if (preg_match('/^([A-Z][A-Z]*[0-9]*[A-Z]*[0-9]*)( .*|$)/', basename($dir), $parts)) {
+  if (preg_match('/^([A-Z][A-Z]*[0-9]*[A-Z]*_?[0-9]*)( .*|$)/', basename($dir), $parts)) {
     return "dirid=".$parts[1];
   } else {
     return "dir=".urlencode($dir);
