@@ -32,6 +32,10 @@ if (!in_array($_POST['cmd'], $safeCmds) && $_POST['verify'] != "ytram") {
       $output = file("/home/groovymarty/dbsync.log");
       $retval = 0;
       break;
+    case 'delCursor':
+      $title="Delete Dropbox Cursor";
+      exec("rm /home/groovymarty/dbox_cursor", $output, $retval);
+      break;
     case 'syncAll':
       $title="Sync All";
       exec("/home/groovymarty/bin/syncAll", $output, $retval);

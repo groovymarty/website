@@ -34,7 +34,10 @@ def scan_dir(relpath):
 print("starting groovydbsync", datetime.datetime.now())
 
 scan_dir("")
- 
+#for key in sorted(lowercase_dir_to_real_dir.keys()):
+#  print(key, "->", lowercase_dir_to_real_dir[key])
+#exit(0)
+
 def list_files(client, cursor=None):
   has_more = True
   reset = False
@@ -51,6 +54,10 @@ def list_files(client, cursor=None):
       # Sometimes last element of path is not lowercase, so force it
       lowercase_path = lowercase_path.lower()
       lowercase_dir, lowercase_file = os.path.split(lowercase_path)
+      # Skip iTunes
+      if lowercase_dir.startswith('/itunes') or lowercase_dir.startswith('/st lukes'):
+        print("Skipping ", lowercase_path)
+        continue
       if lowercase_dir not in lowercase_dir_to_real_dir:
         # This means Dropbox thinks we should have a directory but we don't have it
         print("dir not found:", lowercase_dir, "for file", lowercase_file, "meta" if metadata is not None else "no meta")
@@ -122,6 +129,7 @@ def download(client, realpath, metadata, check_metadata):
         if not buf:
           break
         flocal.write(buf)
+  print(metadata['client_mtime'])
   mtime_dt = datetime.datetime.strptime(metadata['client_mtime'], fmt)
   mtime = mtime_dt.replace(tzinfo=datetime.timezone.utc).timestamp()
   os.utime(realpath, (mtime, mtime))
